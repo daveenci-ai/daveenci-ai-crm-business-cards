@@ -170,7 +170,6 @@ app.post('/process-card', async (req, res) => {
       Industry = '',
       Website = '',
       Notes = '',
-      ScanLocation = '',
       ScannedBy = '',
       // Also support lowercase for backwards compatibility
       name = '',
@@ -183,7 +182,6 @@ app.post('/process-card', async (req, res) => {
       industry = '',
       website = '',
       notes = '',
-      scanLocation = '',
       scannedBy = ''
     } = dataSource;
 
@@ -198,7 +196,6 @@ app.post('/process-card', async (req, res) => {
     console.log('  Industry (raw):', JSON.stringify(Industry || industry || ''));
     console.log('  Website (raw):', JSON.stringify(Website || website || ''));
     console.log('  Notes (raw):', JSON.stringify(Notes || notes || ''));
-    console.log('  📍 ScanLocation (raw):', JSON.stringify(ScanLocation || scanLocation || ''));
     console.log('  👤 ScannedBy (raw):', JSON.stringify(ScannedBy || scannedBy || ''));
 
     // Clean and validate data using utility functions
@@ -214,7 +211,6 @@ app.post('/process-card', async (req, res) => {
     const cleanedIndustry = cleanText(Industry || industry || '');
     const formattedWebsite = cleanWebsite(Website || website || '');
     const cleanedNotes = cleanSimpleText(Notes || notes || '');
-    const cleanedScanLocation = cleanSimpleText(ScanLocation || scanLocation || '');
     const cleanedScannedBy = cleanText(ScannedBy || scannedBy || '');
 
     console.log('\n✨ CLEANED & VALIDATED DATA:');
@@ -229,7 +225,6 @@ app.post('/process-card', async (req, res) => {
     console.log('  Industry (cleaned):', JSON.stringify(cleanedIndustry));
     console.log('  Website (formatted):', JSON.stringify(formattedWebsite));
     console.log('  Notes (cleaned):', JSON.stringify(cleanedNotes));
-    console.log('  📍 ScanLocation (cleaned):', JSON.stringify(cleanedScanLocation));
     console.log('  👤 ScannedBy (cleaned):', JSON.stringify(cleanedScannedBy));
 
     // Validate required fields
@@ -280,13 +275,12 @@ app.post('/process-card', async (req, res) => {
       cleanedCompany || '',
       formattedWebsite || '',
       combinedNotes || '',
-      cleanedScanLocation || '',
       cleanedScannedBy || ''
     ];
 
     console.log('\n🎯 FINAL VALUES FOR DATABASE:');
     finalValues.forEach((value, index) => {
-      const fields = ['full_name', 'email', 'phone', 'company_name', 'website', 'notes', 'scan_location', 'scanned_by'];
+      const fields = ['full_name', 'email', 'phone', 'company_name', 'website', 'notes', 'scanned_by'];
       const status = value ? '✅' : '⭕';
       console.log(`  ${status} $${index + 1} (${fields[index]}): "${value}" (type: ${typeof value}, length: ${value?.length || 0})`);
     });
@@ -299,8 +293,8 @@ app.post('/process-card', async (req, res) => {
     try {
       const insertQuery = `
         INSERT INTO business_cards 
-        (full_name, email, phone, company_name, website, notes, scan_location, scanned_by) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (full_name, email, phone, company_name, website, notes, scanned_by) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, scanned_on;
       `;
 
@@ -336,9 +330,7 @@ app.post('/process-card', async (req, res) => {
           industry: cleanedIndustry,
           notes: cleanedNotes,
           combinedNotes: combinedNotes,
-          scanLocation: cleanedScanLocation,
-          scannedBy: cleanedScannedBy,
-          scanDate: new Date(savedCard.scanned_on).toISOString().split('T')[0]
+          scannedBy: cleanedScannedBy
         },
         validation: {
           warnings: warnings.length > 0 ? warnings : undefined,
@@ -347,7 +339,7 @@ app.post('/process-card', async (req, res) => {
             emailValidated: validatedEmail !== (Email || email || ''),
             phoneFormatted: formattedPhone !== (Phone || phone || ''),
             websiteFormatted: formattedWebsite !== (Website || website || ''),
-            scanMetadataAdded: !!(cleanedScanLocation || cleanedScannedBy)
+            scanMetadataAdded: !!cleanedScannedBy
           }
         }
       };
@@ -387,7 +379,7 @@ app.get('/cards', async (req, res) => {
     try {
       const result = await client.query(`
         SELECT id, full_name, email, phone, company_name, website, notes, 
-               scan_location, scanned_by, scanned_on
+               scanned_by, scanned_on
         FROM business_cards 
         ORDER BY scanned_on DESC
       `);
@@ -424,7 +416,7 @@ app.get('/cards/:id', async (req, res) => {
     try {
       const result = await client.query(`
         SELECT id, full_name, email, phone, company_name, website, notes,
-               scan_location, scanned_by, scanned_on
+               scanned_by, scanned_on
         FROM business_cards WHERE id = $1
       `, [cardId]);
 
