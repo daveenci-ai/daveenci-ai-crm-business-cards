@@ -262,21 +262,12 @@ app.post('/process-card', async (req, res) => {
       warnings.forEach(warning => console.log(`  - ${warning}`));
     }
 
-    // Prepare notes field with additional details
+    // Prepare notes field with additional details (no longer including scan metadata)
     const notesParts = [];
     if (cleanedTitle) notesParts.push(`Title: ${cleanedTitle}`);
     if (cleanedIndustry) notesParts.push(`Industry: ${cleanedIndustry}`);
     if (formattedPhone2) notesParts.push(`Phone2: ${formattedPhone2}`);
     if (cleanedNotes) notesParts.push(`Notes: ${cleanedNotes}`);
-    
-    // Add metadata fields at the end
-    if (cleanedScanLocation || cleanedScannedBy) {
-      notesParts.push(''); // Add empty line before metadata
-      notesParts.push('--- Scan Metadata ---');
-      if (cleanedScanLocation) notesParts.push(`Scanned at: ${cleanedScanLocation}`);
-      if (cleanedScannedBy) notesParts.push(`Scanned by: ${cleanedScannedBy}`);
-      notesParts.push(`Scan date: ${new Date().toISOString().split('T')[0]}`);
-    }
     
     const combinedNotes = notesParts.join('\n');
     console.log('\n📝 COMBINED NOTES:', JSON.stringify(combinedNotes));
@@ -288,12 +279,14 @@ app.post('/process-card', async (req, res) => {
       formattedPhone || '',
       cleanedCompany || '',
       formattedWebsite || '',
-      combinedNotes || ''
+      combinedNotes || '',
+      cleanedScanLocation || '',
+      cleanedScannedBy || ''
     ];
 
     console.log('\n🎯 FINAL VALUES FOR DATABASE:');
     finalValues.forEach((value, index) => {
-      const fields = ['full_name', 'email', 'phone', 'company_name', 'website', 'notes'];
+      const fields = ['full_name', 'email', 'phone', 'company_name', 'website', 'notes', 'scan_location', 'scanned_by'];
       const status = value ? '✅' : '⭕';
       console.log(`  ${status} $${index + 1} (${fields[index]}): "${value}" (type: ${typeof value}, length: ${value?.length || 0})`);
     });
@@ -306,9 +299,9 @@ app.post('/process-card', async (req, res) => {
     try {
       const insertQuery = `
         INSERT INTO business_cards 
-        (full_name, email, phone, company_name, website, notes) 
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, dt;
+        (full_name, email, phone, company_name, website, notes, scan_location, scanned_by) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, scanned_on;
       `;
 
       console.log('\n📄 FULL SQL QUERY:');
@@ -329,7 +322,7 @@ app.post('/process-card', async (req, res) => {
       const responseData = {
         message: 'Business card saved successfully',
         id: savedCard.id,
-        timestamp: savedCard.dt,
+        timestamp: savedCard.scanned_on,
         data: {
           fullName: fullName,
           firstName: firstName,
@@ -345,7 +338,7 @@ app.post('/process-card', async (req, res) => {
           combinedNotes: combinedNotes,
           scanLocation: cleanedScanLocation,
           scannedBy: cleanedScannedBy,
-          scanDate: new Date().toISOString().split('T')[0]
+          scanDate: new Date(savedCard.scanned_on).toISOString().split('T')[0]
         },
         validation: {
           warnings: warnings.length > 0 ? warnings : undefined,
@@ -393,9 +386,10 @@ app.get('/cards', async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query(`
-        SELECT id, full_name, email, phone, company_name, website, notes, dt
+        SELECT id, full_name, email, phone, company_name, website, notes, 
+               scan_location, scanned_by, scanned_on
         FROM business_cards 
-        ORDER BY dt DESC
+        ORDER BY scanned_on DESC
       `);
 
       res.json({
@@ -429,7 +423,9 @@ app.get('/cards/:id', async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query(`
-        SELECT * FROM business_cards WHERE id = $1
+        SELECT id, full_name, email, phone, company_name, website, notes,
+               scan_location, scanned_by, scanned_on
+        FROM business_cards WHERE id = $1
       `, [cardId]);
 
       if (result.rows.length === 0) {
