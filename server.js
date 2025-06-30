@@ -200,30 +200,30 @@ app.post('/process-card', async (req, res) => {
     const lastName = cleanName(Surname || surname || '');
     const fullName = `${firstName} ${lastName}`.trim();
     
-    const cleanEmail = validateEmail(Email || email || '');
-    const cleanPhone = formatPhoneNumber(Phone || phone || '');
-    const cleanPhone2 = formatPhoneNumber(Phone2 || phone2 || '');
-    const cleanCompany = cleanText(Company || company || '');
-    const cleanTitle = cleanText(Title || title || '');
-    const cleanIndustry = cleanText(Industry || industry || '');
-    const cleanWebsite = cleanWebsite(Website || website || '');
-    const cleanNotes = cleanSimpleText(Notes || notes || '');
+    const validatedEmail = validateEmail(Email || email || '');
+    const formattedPhone = formatPhoneNumber(Phone || phone || '');
+    const formattedPhone2 = formatPhoneNumber(Phone2 || phone2 || '');
+    const cleanedCompany = cleanText(Company || company || '');
+    const cleanedTitle = cleanText(Title || title || '');
+    const cleanedIndustry = cleanText(Industry || industry || '');
+    const formattedWebsite = cleanWebsite(Website || website || '');
+    const cleanedNotes = cleanSimpleText(Notes || notes || '');
 
     console.log('\n✨ CLEANED & VALIDATED DATA:');
     console.log('  Name (first):', JSON.stringify(firstName));
     console.log('  Surname (last):', JSON.stringify(lastName));
     console.log('  Full Name (combined):', JSON.stringify(fullName));
-    console.log('  Email (validated):', JSON.stringify(cleanEmail));
-    console.log('  Phone (formatted):', JSON.stringify(cleanPhone));
-    console.log('  Phone2 (formatted):', JSON.stringify(cleanPhone2));
-    console.log('  Company (cleaned):', JSON.stringify(cleanCompany));
-    console.log('  Title (cleaned):', JSON.stringify(cleanTitle));
-    console.log('  Industry (cleaned):', JSON.stringify(cleanIndustry));
-    console.log('  Website (formatted):', JSON.stringify(cleanWebsite));
-    console.log('  Notes (cleaned):', JSON.stringify(cleanNotes));
+    console.log('  Email (validated):', JSON.stringify(validatedEmail));
+    console.log('  Phone (formatted):', JSON.stringify(formattedPhone));
+    console.log('  Phone2 (formatted):', JSON.stringify(formattedPhone2));
+    console.log('  Company (cleaned):', JSON.stringify(cleanedCompany));
+    console.log('  Title (cleaned):', JSON.stringify(cleanedTitle));
+    console.log('  Industry (cleaned):', JSON.stringify(cleanedIndustry));
+    console.log('  Website (formatted):', JSON.stringify(formattedWebsite));
+    console.log('  Notes (cleaned):', JSON.stringify(cleanedNotes));
 
     // Validate required fields
-    if (!fullName && !cleanEmail && !cleanPhone && !cleanCompany) {
+    if (!fullName && !validatedEmail && !formattedPhone && !cleanedCompany) {
       console.log('❌ VALIDATION FAILED: No name, email, phone, or company provided');
       return res.status(400).json({
         error: 'At least one of name, email, phone, or company is required'
@@ -235,15 +235,15 @@ app.post('/process-card', async (req, res) => {
     // Additional data quality checks and warnings
     const warnings = [];
     
-    if (cleanEmail && !cleanEmail.includes('@')) {
+    if (validatedEmail && !validatedEmail.includes('@')) {
       warnings.push('Email format may be invalid');
     }
     
-    if (cleanPhone && cleanPhone.length < 10) {
+    if (formattedPhone && formattedPhone.length < 10) {
       warnings.push('Phone number may be too short');
     }
     
-    if (cleanWebsite && !cleanWebsite.includes('.')) {
+    if (formattedWebsite && !formattedWebsite.includes('.')) {
       warnings.push('Website format may be invalid');
     }
     
@@ -254,10 +254,10 @@ app.post('/process-card', async (req, res) => {
 
     // Prepare notes field with additional details
     const notesParts = [];
-    if (cleanTitle) notesParts.push(`Title: ${cleanTitle}`);
-    if (cleanIndustry) notesParts.push(`Industry: ${cleanIndustry}`);
-    if (cleanPhone2) notesParts.push(`Phone2: ${cleanPhone2}`);
-    if (cleanNotes) notesParts.push(`Notes: ${cleanNotes}`);
+    if (cleanedTitle) notesParts.push(`Title: ${cleanedTitle}`);
+    if (cleanedIndustry) notesParts.push(`Industry: ${cleanedIndustry}`);
+    if (formattedPhone2) notesParts.push(`Phone2: ${formattedPhone2}`);
+    if (cleanedNotes) notesParts.push(`Notes: ${cleanedNotes}`);
     
     const combinedNotes = notesParts.join('\n');
     console.log('\n📝 COMBINED NOTES:', JSON.stringify(combinedNotes));
@@ -265,10 +265,10 @@ app.post('/process-card', async (req, res) => {
     // Prepare final values for database with additional validation
     const finalValues = [
       fullName || '', // Ensure never null
-      cleanEmail || '',
-      cleanPhone || '',
-      cleanCompany || '',
-      cleanWebsite || '',
+      validatedEmail || '',
+      formattedPhone || '',
+      cleanedCompany || '',
+      formattedWebsite || '',
       combinedNotes || ''
     ];
 
@@ -315,23 +315,23 @@ app.post('/process-card', async (req, res) => {
           fullName: fullName,
           firstName: firstName,
           lastName: lastName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          phone2: cleanPhone2,
-          company: cleanCompany,
-          website: cleanWebsite,
-          title: cleanTitle,
-          industry: cleanIndustry,
-          notes: cleanNotes,
+          email: validatedEmail,
+          phone: formattedPhone,
+          phone2: formattedPhone2,
+          company: cleanedCompany,
+          website: formattedWebsite,
+          title: cleanedTitle,
+          industry: cleanedIndustry,
+          notes: cleanedNotes,
           combinedNotes: combinedNotes
         },
         validation: {
           warnings: warnings.length > 0 ? warnings : undefined,
           cleaned: {
             nameFormatted: firstName !== (Name || name || '') || lastName !== (Surname || surname || ''),
-            emailValidated: cleanEmail !== (Email || email || ''),
-            phoneFormatted: cleanPhone !== (Phone || phone || ''),
-            websiteFormatted: cleanWebsite !== (Website || website || ''),
+            emailValidated: validatedEmail !== (Email || email || ''),
+            phoneFormatted: formattedPhone !== (Phone || phone || ''),
+            websiteFormatted: formattedWebsite !== (Website || website || ''),
           }
         }
       };
