@@ -62,8 +62,9 @@ function removeNumberedPrefixes(text) {
   // Remove numbered prefixes like "1. ", "2. ", "10. ", etc. at the beginning
   cleaned = cleaned.replace(/^\d+\.\s*/, '');
   
-  // Remove numbered prefixes that might appear anywhere like "9. website:" or "3. Company:"
-  cleaned = cleaned.replace(/\d+\.\s*(website|company|name|surname|email|phone|phone2|title|industry|notes|scannedby):\s*/gi, '');
+  // Remove numbered prefixes with field names (with or without colons)
+  // Handles: "9. website:", "3. Company:", "7. Phone", etc.
+  cleaned = cleaned.replace(/\d+\.\s*(website|company|name|surname|email|phone|phone2|title|industry|notes|scannedby):?\s*/gi, '');
   
   // Remove common field prefixes (case insensitive) that might appear at start
   const prefixes = ['Name:', 'Surname:', 'Email:', 'Phone:', 'Phone2:', 'Company:', 'Title:', 'Industry:', 'Website:', 'Notes:', 'ScannedBy:'];
@@ -78,8 +79,14 @@ function removeNumberedPrefixes(text) {
     cleaned = cleaned.replace(regex, ' ');
   });
   
-  // Clean up cases like "https://9. website:" -> "https://"
-  cleaned = cleaned.replace(/([a-zA-Z0-9@.])\d+\.\s*(website|company|name|surname|email|phone|title|industry|notes):\s*/gi, '$1');
+  // Clean up cases like "https://9. website:" -> "https://"  
+  cleaned = cleaned.replace(/([a-zA-Z0-9@.])\d+\.\s*(website|company|name|surname|email|phone|title|industry|notes):?\s*/gi, '$1');
+  
+  // Handle cases where the entire string is just a field name like "7. Phone"
+  const fieldOnlyPattern = /^\d*\.\s*(website|company|name|surname|email|phone|phone2|title|industry|notes|scannedby):?\s*$/i;
+  if (fieldOnlyPattern.test(cleaned)) {
+    return ''; // Return empty string if it's just a field name
+  }
   
   // Remove trailing commas and extra whitespace
   cleaned = cleaned.replace(/,\s*$/, '').trim();
