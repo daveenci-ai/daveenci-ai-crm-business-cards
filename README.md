@@ -1,6 +1,6 @@
-# Business Card CRM Processing Service
+# Business Card CRM API
 
-A simple Flask-based web service that receives business card contact information and stores it in a PostgreSQL database. Designed to work with iPhone Shortcuts for seamless business card data collection.
+A modern Node.js Express API that receives business card contact information and stores it in a PostgreSQL database. Designed to work with iPhone Shortcuts for seamless business card data collection.
 
 ## Features
 
@@ -67,6 +67,9 @@ Retrieve all processed business cards.
 ### GET `/cards/{id}`
 Retrieve a specific business card by ID.
 
+### DELETE `/cards/{id}`
+Delete a specific business card by ID.
+
 ### GET `/`
 Health check endpoint.
 
@@ -82,10 +85,11 @@ Create environment variables based on `env_example.txt`:
 ### 2. For Render.com Deployment
 
 1. **Connect Repository**: Link this GitHub repository to your Render Web Service
-2. **Set Build Command**: `pip install -r requirements.txt`
-3. **Set Start Command**: `gunicorn app:app`
+2. **Set Build Command**: `npm install`
+3. **Set Start Command**: `npm start`
 4. **Configure Environment Variables** in Render dashboard:
    - `DATABASE_URL` is automatically provided by Render when you create a PostgreSQL database
+   - `NODE_ENV=production` (optional, for production optimizations)
    - Link your PostgreSQL database to your web service
 
 ### 3. For Local Development
@@ -96,13 +100,17 @@ git clone https://github.com/daveenci-ai/daveenci-ai-crm-business-cards.git
 cd daveenci-ai-crm-business-cards
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
 
 # Set environment variables (create .env file)
 export DATABASE_URL=postgresql://username:password@localhost:5432/database_name
+export NODE_ENV=development
 
 # Run the application
-python app.py
+npm start
+
+# Or run in development mode with auto-restart
+npm run dev
 ```
 
 ## Database Schema
@@ -147,16 +155,20 @@ To use with iOS Shortcuts:
 
 ## Technology Stack
 
-- **Backend**: Flask (Python)
-- **Database**: PostgreSQL
-- **Deployment**: Gunicorn WSGI server
+- **Backend**: Express.js (Node.js)
+- **Database**: PostgreSQL with connection pooling
+- **Security**: Helmet.js, CORS
+- **Performance**: Compression middleware
+- **Deployment**: Native Node.js server
 
 ## Architecture
 
-1. **Data Reception**: Flask receives structured contact data via JSON or form data
-2. **Data Validation**: Validates required fields and data format
-3. **Database Storage**: Saves structured data to PostgreSQL
-4. **Response**: Returns success confirmation with saved data
+1. **Data Reception**: Express.js receives structured contact data via JSON or form data
+2. **Connection Pooling**: PostgreSQL connection pool for optimal performance
+3. **Data Validation**: Validates required fields and data format
+4. **Database Storage**: Saves structured data to PostgreSQL with proper error handling
+5. **Response**: Returns success confirmation with saved data
+6. **Graceful Shutdown**: Proper cleanup of database connections
 
 ## Error Handling
 
@@ -172,10 +184,23 @@ To use with iOS Shortcuts:
 - CORS enabled for cross-origin requests
 - Input validation and sanitization
 
+## Testing
+
+Test your deployed API:
+```bash
+node test-api.js https://your-app.onrender.com
+```
+
+For local testing:
+```bash
+npm test
+```
+
 ## Support
 
 For issues or questions, please check:
-1. Render deployment logs for runtime errors
-2. Database connection settings
-3. Environment variable configuration
+1. Render deployment logs for Node.js runtime errors
+2. Database connection settings and `DATABASE_URL`
+3. Environment variable configuration (`NODE_ENV`, `PORT`)
 4. Data format requirements (JSON or form data)
+5. Node.js version compatibility (requires Node.js 18+)

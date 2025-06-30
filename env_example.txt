@@ -1,5 +1,6 @@
 # Database Configuration (Required)
 DATABASE_URL=postgresql://username:password@hostname:port/database_name
 
-# Flask Configuration
-FLASK_ENV=production 
+# Node.js Configuration
+NODE_ENV=production
+PORT=5000 

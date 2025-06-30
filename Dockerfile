@@ -1,23 +1,29 @@
-FROM python:3.11-slim
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy package files first for better caching
+COPY package*.json ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies
+RUN npm ci --only=production
 
 # Copy application code
 COPY . .
 
 # Create non-root user for security
-RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
-USER app
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodeuser -u 1001
+RUN chown -R nodeuser:nodejs /app
+USER nodeuser
 
 # Expose port
 EXPOSE 5000
 
-# Run with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"] 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5000/', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Start the application
+CMD ["node", "server.js"] 
