@@ -74,6 +74,11 @@ app.post('/process-card', async (req, res) => {
   console.log('📦 Raw request body:', JSON.stringify(req.body, null, 2));
   
   try {
+    // Handle nested data structure from iPhone Shortcut
+    console.log('🔄 Checking data structure...');
+    const dataSource = req.body[""] || req.body;
+    console.log('📊 Data source:', JSON.stringify(dataSource, null, 2));
+    
     const {
       Name = '',
       Surname = '',
@@ -96,7 +101,7 @@ app.post('/process-card', async (req, res) => {
       industry = '',
       website = '',
       notes = ''
-    } = req.body;
+    } = dataSource;
 
     // Combine first and last name
     const firstName = Name || name || '';
