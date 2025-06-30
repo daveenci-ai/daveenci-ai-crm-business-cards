@@ -75,28 +75,59 @@ app.post('/process-card', async (req, res) => {
   
   try {
     const {
+      Name = '',
+      Surname = '',
+      Email = '',
+      Phone = '',
+      Phone2 = '',
+      Company = '',
+      Title = '',
+      Industry = '',
+      Website = '',
+      Notes = '',
+      // Also support lowercase for backwards compatibility
       name = '',
+      surname = '',
       email = '',
       phone = '',
+      phone2 = '',
       company = '',
       title = '',
+      industry = '',
       website = '',
-      address = '',
       notes = ''
     } = req.body;
 
+    // Combine first and last name
+    const firstName = Name || name || '';
+    const lastName = Surname || surname || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    
+    // Use capitalized versions first, then fallback to lowercase
+    const cleanEmail = Email || email || '';
+    const cleanPhone = Phone || phone || '';
+    const cleanPhone2 = Phone2 || phone2 || '';
+    const cleanCompany = Company || company || '';
+    const cleanTitle = Title || title || '';
+    const cleanIndustry = Industry || industry || '';
+    const cleanWebsite = Website || website || '';
+    const cleanNotes = Notes || notes || '';
+
     console.log('\n📋 EXTRACTED DATA:');
-    console.log('  name:', JSON.stringify(name));
-    console.log('  email:', JSON.stringify(email));
-    console.log('  phone:', JSON.stringify(phone));
-    console.log('  company:', JSON.stringify(company));
-    console.log('  website:', JSON.stringify(website));
-    console.log('  title:', JSON.stringify(title));
-    console.log('  address:', JSON.stringify(address));
-    console.log('  notes:', JSON.stringify(notes));
+    console.log('  Name (first):', JSON.stringify(firstName));
+    console.log('  Surname (last):', JSON.stringify(lastName));
+    console.log('  Full Name (combined):', JSON.stringify(fullName));
+    console.log('  Email:', JSON.stringify(cleanEmail));
+    console.log('  Phone:', JSON.stringify(cleanPhone));
+    console.log('  Phone2:', JSON.stringify(cleanPhone2));
+    console.log('  Company:', JSON.stringify(cleanCompany));
+    console.log('  Title:', JSON.stringify(cleanTitle));
+    console.log('  Industry:', JSON.stringify(cleanIndustry));
+    console.log('  Website:', JSON.stringify(cleanWebsite));
+    console.log('  Notes:', JSON.stringify(cleanNotes));
 
     // Validate required fields
-    if (!name && !email && !phone && !company) {
+    if (!fullName && !cleanEmail && !cleanPhone && !cleanCompany) {
       console.log('❌ VALIDATION FAILED: No name, email, phone, or company provided');
       return res.status(400).json({
         error: 'At least one of name, email, phone, or company is required'
@@ -107,20 +138,21 @@ app.post('/process-card', async (req, res) => {
 
     // Prepare notes field with additional details
     const notesParts = [];
-    if (title) notesParts.push(`Title: ${title}`);
-    if (address) notesParts.push(`Address: ${address}`);
-    if (notes) notesParts.push(`Notes: ${notes}`);
+    if (cleanTitle) notesParts.push(`Title: ${cleanTitle}`);
+    if (cleanIndustry) notesParts.push(`Industry: ${cleanIndustry}`);
+    if (cleanPhone2) notesParts.push(`Phone2: ${cleanPhone2}`);
+    if (cleanNotes) notesParts.push(`Notes: ${cleanNotes}`);
     
     const combinedNotes = notesParts.join('\n');
     console.log('\n📝 COMBINED NOTES:', JSON.stringify(combinedNotes));
 
     // Prepare final values for database
     const finalValues = [
-      name.trim(),
-      email.trim(),
-      phone.trim(),
-      company.trim(),
-      website.trim(),
+      fullName.trim(),
+      cleanEmail.trim(),
+      cleanPhone.trim(),
+      cleanCompany.trim(),
+      cleanWebsite.trim(),
       combinedNotes
     ];
 
@@ -163,14 +195,18 @@ app.post('/process-card', async (req, res) => {
         id: savedCard.id,
         timestamp: savedCard.dt,
         data: {
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          company: company.trim(),
-          website: website.trim(),
-          title: title.trim(),
-          address: address.trim(),
-          notes: notes.trim()
+          fullName: fullName.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: cleanEmail.trim(),
+          phone: cleanPhone.trim(),
+          phone2: cleanPhone2.trim(),
+          company: cleanCompany.trim(),
+          website: cleanWebsite.trim(),
+          title: cleanTitle.trim(),
+          industry: cleanIndustry.trim(),
+          notes: cleanNotes.trim(),
+          combinedNotes: combinedNotes
         }
       };
 
