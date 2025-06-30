@@ -68,6 +68,11 @@ app.get('/', (req, res) => {
 
 // Process business card endpoint
 app.post('/process-card', async (req, res) => {
+  console.log('\n🔍 === BUSINESS CARD PROCESSING DEBUG LOG ===');
+  console.log('📅 Timestamp:', new Date().toISOString());
+  console.log('🌐 Request headers:', JSON.stringify(req.headers, null, 2));
+  console.log('📦 Raw request body:', JSON.stringify(req.body, null, 2));
+  
   try {
     const {
       name = '',
@@ -80,14 +85,25 @@ app.post('/process-card', async (req, res) => {
       notes = ''
     } = req.body;
 
-    console.log('Received business card data:', req.body);
+    console.log('\n📋 EXTRACTED DATA:');
+    console.log('  name:', JSON.stringify(name));
+    console.log('  email:', JSON.stringify(email));
+    console.log('  phone:', JSON.stringify(phone));
+    console.log('  company:', JSON.stringify(company));
+    console.log('  website:', JSON.stringify(website));
+    console.log('  title:', JSON.stringify(title));
+    console.log('  address:', JSON.stringify(address));
+    console.log('  notes:', JSON.stringify(notes));
 
     // Validate required fields
     if (!name && !email && !phone && !company) {
+      console.log('❌ VALIDATION FAILED: No name, email, phone, or company provided');
       return res.status(400).json({
         error: 'At least one of name, email, phone, or company is required'
       });
     }
+
+    console.log('✅ VALIDATION PASSED: At least one required field provided');
 
     // Prepare notes field with additional details
     const notesParts = [];
@@ -96,9 +112,29 @@ app.post('/process-card', async (req, res) => {
     if (notes) notesParts.push(`Notes: ${notes}`);
     
     const combinedNotes = notesParts.join('\n');
+    console.log('\n📝 COMBINED NOTES:', JSON.stringify(combinedNotes));
+
+    // Prepare final values for database
+    const finalValues = [
+      name.trim(),
+      email.trim(),
+      phone.trim(),
+      company.trim(),
+      website.trim(),
+      combinedNotes
+    ];
+
+    console.log('\n🎯 FINAL VALUES FOR DATABASE:');
+    finalValues.forEach((value, index) => {
+      const fields = ['full_name', 'email', 'phone', 'company_name', 'website', 'notes'];
+      console.log(`  $${index + 1} (${fields[index]}): "${value}" (type: ${typeof value}, length: ${value?.length || 0})`);
+    });
 
     // Insert into database
+    console.log('\n🔗 CONNECTING TO DATABASE...');
     const client = await pool.connect();
+    console.log('✅ DATABASE CONNECTION ESTABLISHED');
+    
     try {
       const insertQuery = `
         INSERT INTO business_cards 
@@ -107,19 +143,22 @@ app.post('/process-card', async (req, res) => {
         RETURNING id, dt;
       `;
 
-      const result = await client.query(insertQuery, [
-        name.trim(),
-        email.trim(),
-        phone.trim(),
-        company.trim(),
-        website.trim(),
-        combinedNotes
-      ]);
+      console.log('\n📄 FULL SQL QUERY:');
+      console.log(insertQuery);
+      console.log('\n🔢 QUERY PARAMETERS:');
+      finalValues.forEach((value, index) => {
+        console.log(`  $${index + 1}: "${value}"`);
+      });
 
+      console.log('\n⚡ EXECUTING QUERY...');
+      const result = await client.query(insertQuery, finalValues);
+      
       const savedCard = result.rows[0];
-      console.log(`Successfully saved business card with ID: ${savedCard.id}`);
+      console.log('\n🎉 SUCCESS! Database insertion completed');
+      console.log('💾 Returned data:', JSON.stringify(savedCard, null, 2));
+      console.log(`✅ Successfully saved business card with ID: ${savedCard.id}`);
 
-      res.status(200).json({
+      const responseData = {
         message: 'Business card saved successfully',
         id: savedCard.id,
         timestamp: savedCard.dt,
@@ -133,17 +172,32 @@ app.post('/process-card', async (req, res) => {
           address: address.trim(),
           notes: notes.trim()
         }
-      });
+      };
+
+      console.log('\n📤 RESPONSE DATA:', JSON.stringify(responseData, null, 2));
+      console.log('🔍 === END BUSINESS CARD PROCESSING DEBUG LOG ===\n');
+
+      res.status(200).json(responseData);
 
     } finally {
+      console.log('🔌 RELEASING DATABASE CONNECTION');
       client.release();
     }
 
   } catch (error) {
-    console.error('Error saving business card:', error);
+    console.log('\n💥 ERROR OCCURRED:');
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error detail:', error.detail);
+    console.error('❌ Error hint:', error.hint);
+    console.error('❌ Full error object:', error);
+    console.log('🔍 === END BUSINESS CARD PROCESSING DEBUG LOG (ERROR) ===\n');
+    
     res.status(500).json({
       error: 'Failed to save business card',
-      details: error.message
+      details: error.message,
+      code: error.code
     });
   }
 });
