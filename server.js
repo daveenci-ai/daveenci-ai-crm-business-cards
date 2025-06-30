@@ -170,6 +170,8 @@ app.post('/process-card', async (req, res) => {
       Industry = '',
       Website = '',
       Notes = '',
+      ScanLocation = '',
+      ScannedBy = '',
       // Also support lowercase for backwards compatibility
       name = '',
       surname = '',
@@ -180,7 +182,9 @@ app.post('/process-card', async (req, res) => {
       title = '',
       industry = '',
       website = '',
-      notes = ''
+      notes = '',
+      scanLocation = '',
+      scannedBy = ''
     } = dataSource;
 
     console.log('\n📋 RAW EXTRACTED DATA:');
@@ -194,6 +198,8 @@ app.post('/process-card', async (req, res) => {
     console.log('  Industry (raw):', JSON.stringify(Industry || industry || ''));
     console.log('  Website (raw):', JSON.stringify(Website || website || ''));
     console.log('  Notes (raw):', JSON.stringify(Notes || notes || ''));
+    console.log('  📍 ScanLocation (raw):', JSON.stringify(ScanLocation || scanLocation || ''));
+    console.log('  👤 ScannedBy (raw):', JSON.stringify(ScannedBy || scannedBy || ''));
 
     // Clean and validate data using utility functions
     const firstName = cleanName(Name || name || '');
@@ -208,6 +214,8 @@ app.post('/process-card', async (req, res) => {
     const cleanedIndustry = cleanText(Industry || industry || '');
     const formattedWebsite = cleanWebsite(Website || website || '');
     const cleanedNotes = cleanSimpleText(Notes || notes || '');
+    const cleanedScanLocation = cleanSimpleText(ScanLocation || scanLocation || '');
+    const cleanedScannedBy = cleanText(ScannedBy || scannedBy || '');
 
     console.log('\n✨ CLEANED & VALIDATED DATA:');
     console.log('  Name (first):', JSON.stringify(firstName));
@@ -221,6 +229,8 @@ app.post('/process-card', async (req, res) => {
     console.log('  Industry (cleaned):', JSON.stringify(cleanedIndustry));
     console.log('  Website (formatted):', JSON.stringify(formattedWebsite));
     console.log('  Notes (cleaned):', JSON.stringify(cleanedNotes));
+    console.log('  📍 ScanLocation (cleaned):', JSON.stringify(cleanedScanLocation));
+    console.log('  👤 ScannedBy (cleaned):', JSON.stringify(cleanedScannedBy));
 
     // Validate required fields
     if (!fullName && !validatedEmail && !formattedPhone && !cleanedCompany) {
@@ -258,6 +268,15 @@ app.post('/process-card', async (req, res) => {
     if (cleanedIndustry) notesParts.push(`Industry: ${cleanedIndustry}`);
     if (formattedPhone2) notesParts.push(`Phone2: ${formattedPhone2}`);
     if (cleanedNotes) notesParts.push(`Notes: ${cleanedNotes}`);
+    
+    // Add metadata fields at the end
+    if (cleanedScanLocation || cleanedScannedBy) {
+      notesParts.push(''); // Add empty line before metadata
+      notesParts.push('--- Scan Metadata ---');
+      if (cleanedScanLocation) notesParts.push(`Scanned at: ${cleanedScanLocation}`);
+      if (cleanedScannedBy) notesParts.push(`Scanned by: ${cleanedScannedBy}`);
+      notesParts.push(`Scan date: ${new Date().toISOString().split('T')[0]}`);
+    }
     
     const combinedNotes = notesParts.join('\n');
     console.log('\n📝 COMBINED NOTES:', JSON.stringify(combinedNotes));
@@ -323,7 +342,10 @@ app.post('/process-card', async (req, res) => {
           title: cleanedTitle,
           industry: cleanedIndustry,
           notes: cleanedNotes,
-          combinedNotes: combinedNotes
+          combinedNotes: combinedNotes,
+          scanLocation: cleanedScanLocation,
+          scannedBy: cleanedScannedBy,
+          scanDate: new Date().toISOString().split('T')[0]
         },
         validation: {
           warnings: warnings.length > 0 ? warnings : undefined,
@@ -332,6 +354,7 @@ app.post('/process-card', async (req, res) => {
             emailValidated: validatedEmail !== (Email || email || ''),
             phoneFormatted: formattedPhone !== (Phone || phone || ''),
             websiteFormatted: formattedWebsite !== (Website || website || ''),
+            scanMetadataAdded: !!(cleanedScanLocation || cleanedScannedBy)
           }
         }
       };
