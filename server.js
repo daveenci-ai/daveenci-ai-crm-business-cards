@@ -54,9 +54,55 @@ async function connectDB() {
 connectDB();
 
 // Data validation and cleanup utilities
+function removeNumberedPrefixes(text) {
+  if (!text) return '';
+  
+  let cleaned = text.toString().trim();
+  
+  // Remove numbered prefixes like "1. ", "2. ", "10. ", etc. at the beginning
+  cleaned = cleaned.replace(/^\d+\.\s*/, '');
+  
+  // Remove numbered prefixes that might appear anywhere like "9. website:" or "3. Company:"
+  cleaned = cleaned.replace(/\d+\.\s*(website|company|name|surname|email|phone|phone2|title|industry|notes|scannedby):\s*/gi, '');
+  
+  // Remove common field prefixes (case insensitive) that might appear at start
+  const prefixes = ['Name:', 'Surname:', 'Email:', 'Phone:', 'Phone2:', 'Company:', 'Title:', 'Industry:', 'Website:', 'Notes:', 'ScannedBy:'];
+  prefixes.forEach(prefix => {
+    const regex = new RegExp(`^${prefix}\\s*`, 'i');
+    cleaned = cleaned.replace(regex, '');
+  });
+  
+  // Remove field prefixes that might appear anywhere in the string
+  prefixes.forEach(prefix => {
+    const regex = new RegExp(`\\s+${prefix}\\s*`, 'gi');
+    cleaned = cleaned.replace(regex, ' ');
+  });
+  
+  // Clean up cases like "https://9. website:" -> "https://"
+  cleaned = cleaned.replace(/([a-zA-Z0-9@.])\d+\.\s*(website|company|name|surname|email|phone|title|industry|notes):\s*/gi, '$1');
+  
+  // Remove trailing commas and extra whitespace
+  cleaned = cleaned.replace(/,\s*$/, '').trim();
+  
+  // Remove quotes if the entire string is wrapped in quotes
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || 
+      (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  
+  // Clean up multiple spaces
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
+
 function cleanName(name) {
   if (!name) return '';
-  return name
+  
+  // First remove numbered prefixes and formatting
+  const cleaned = removeNumberedPrefixes(name);
+  
+  return cleaned
     .trim()
     .replace(/\s+/g, ' ') // Replace multiple spaces with single space
     .split(' ')
@@ -67,8 +113,11 @@ function cleanName(name) {
 function formatPhoneNumber(phone) {
   if (!phone) return '';
   
+  // First remove numbered prefixes and formatting
+  const cleaned = removeNumberedPrefixes(phone);
+  
   // Extract digits only
-  const digits = phone.replace(/\D/g, '');
+  const digits = cleaned.replace(/\D/g, '');
   
   if (digits.length === 10) {
     // Format as XXX-XXX-XXXX
@@ -95,17 +144,19 @@ function formatPhoneNumber(phone) {
 function validateEmail(email) {
   if (!email) return '';
   
-  const cleaned = email.trim().toLowerCase();
+  // First remove numbered prefixes and formatting
+  const cleaned = removeNumberedPrefixes(email).trim().toLowerCase();
   
   // Basic email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(cleaned) ? cleaned : email.trim(); // Return original if invalid format
+  return emailRegex.test(cleaned) ? cleaned : removeNumberedPrefixes(email).trim(); // Return original if invalid format
 }
 
 function cleanWebsite(website) {
   if (!website) return '';
   
-  let cleaned = website.trim().toLowerCase();
+  // First remove numbered prefixes and formatting
+  let cleaned = removeNumberedPrefixes(website).trim().toLowerCase();
   
   // Remove trailing slashes
   cleaned = cleaned.replace(/\/+$/, '');
@@ -120,7 +171,11 @@ function cleanWebsite(website) {
 
 function cleanText(text) {
   if (!text) return '';
-  return text
+  
+  // First remove numbered prefixes and formatting
+  const cleaned = removeNumberedPrefixes(text);
+  
+  return cleaned
     .trim()
     .replace(/\s+/g, ' ') // Replace multiple spaces with single space
     .split(' ')
@@ -130,7 +185,11 @@ function cleanText(text) {
 
 function cleanSimpleText(text) {
   if (!text) return '';
-  return text.trim().replace(/\s+/g, ' ');
+  
+  // First remove numbered prefixes and formatting
+  const cleaned = removeNumberedPrefixes(text);
+  
+  return cleaned.trim().replace(/\s+/g, ' ');
 }
 
 // Routes
