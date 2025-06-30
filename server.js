@@ -53,6 +53,86 @@ async function connectDB() {
 // Initialize database connection
 connectDB();
 
+// Data validation and cleanup utilities
+function cleanName(name) {
+  if (!name) return '';
+  return name
+    .trim()
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  
+  // Extract digits only
+  const digits = phone.replace(/\D/g, '');
+  
+  if (digits.length === 10) {
+    // Format as XXX-XXX-XXXX
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  } else if (digits.length === 11 && digits.startsWith('1')) {
+    // Format as +1 XXX-XXX-XXXX
+    return `+1 ${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 11) {
+    // International format
+    return `+${digits.slice(0, 1)} ${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  } else if (digits.length > 11) {
+    // Long international number - keep first part separate
+    return `+${digits.slice(0, digits.length - 10)} ${digits.slice(-10, -7)}-${digits.slice(-7, -4)}-${digits.slice(-4)}`;
+  } else if (digits.length >= 7) {
+    // Partial number - format what we have
+    return digits.length >= 7 ? 
+      `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}` : 
+      digits;
+  }
+  
+  return digits; // Return as-is if too short
+}
+
+function validateEmail(email) {
+  if (!email) return '';
+  
+  const cleaned = email.trim().toLowerCase();
+  
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(cleaned) ? cleaned : email.trim(); // Return original if invalid format
+}
+
+function cleanWebsite(website) {
+  if (!website) return '';
+  
+  let cleaned = website.trim().toLowerCase();
+  
+  // Remove trailing slashes
+  cleaned = cleaned.replace(/\/+$/, '');
+  
+  // Add https:// if no protocol
+  if (cleaned && !cleaned.match(/^https?:\/\//)) {
+    cleaned = `https://${cleaned}`;
+  }
+  
+  return cleaned;
+}
+
+function cleanText(text) {
+  if (!text) return '';
+  return text
+    .trim()
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function cleanSimpleText(text) {
+  if (!text) return '';
+  return text.trim().replace(/\s+/g, ' ');
+}
+
 // Routes
 
 // Health check endpoint
@@ -103,33 +183,44 @@ app.post('/process-card', async (req, res) => {
       notes = ''
     } = dataSource;
 
-    // Combine first and last name
-    const firstName = Name || name || '';
-    const lastName = Surname || surname || '';
+    console.log('\n📋 RAW EXTRACTED DATA:');
+    console.log('  Name (raw):', JSON.stringify(Name || name || ''));
+    console.log('  Surname (raw):', JSON.stringify(Surname || surname || ''));
+    console.log('  Email (raw):', JSON.stringify(Email || email || ''));
+    console.log('  Phone (raw):', JSON.stringify(Phone || phone || ''));
+    console.log('  Phone2 (raw):', JSON.stringify(Phone2 || phone2 || ''));
+    console.log('  Company (raw):', JSON.stringify(Company || company || ''));
+    console.log('  Title (raw):', JSON.stringify(Title || title || ''));
+    console.log('  Industry (raw):', JSON.stringify(Industry || industry || ''));
+    console.log('  Website (raw):', JSON.stringify(Website || website || ''));
+    console.log('  Notes (raw):', JSON.stringify(Notes || notes || ''));
+
+    // Clean and validate data using utility functions
+    const firstName = cleanName(Name || name || '');
+    const lastName = cleanName(Surname || surname || '');
     const fullName = `${firstName} ${lastName}`.trim();
     
-    // Use capitalized versions first, then fallback to lowercase
-    const cleanEmail = Email || email || '';
-    const cleanPhone = Phone || phone || '';
-    const cleanPhone2 = Phone2 || phone2 || '';
-    const cleanCompany = Company || company || '';
-    const cleanTitle = Title || title || '';
-    const cleanIndustry = Industry || industry || '';
-    const cleanWebsite = Website || website || '';
-    const cleanNotes = Notes || notes || '';
+    const cleanEmail = validateEmail(Email || email || '');
+    const cleanPhone = formatPhoneNumber(Phone || phone || '');
+    const cleanPhone2 = formatPhoneNumber(Phone2 || phone2 || '');
+    const cleanCompany = cleanText(Company || company || '');
+    const cleanTitle = cleanText(Title || title || '');
+    const cleanIndustry = cleanText(Industry || industry || '');
+    const cleanWebsite = cleanWebsite(Website || website || '');
+    const cleanNotes = cleanSimpleText(Notes || notes || '');
 
-    console.log('\n📋 EXTRACTED DATA:');
+    console.log('\n✨ CLEANED & VALIDATED DATA:');
     console.log('  Name (first):', JSON.stringify(firstName));
     console.log('  Surname (last):', JSON.stringify(lastName));
     console.log('  Full Name (combined):', JSON.stringify(fullName));
-    console.log('  Email:', JSON.stringify(cleanEmail));
-    console.log('  Phone:', JSON.stringify(cleanPhone));
-    console.log('  Phone2:', JSON.stringify(cleanPhone2));
-    console.log('  Company:', JSON.stringify(cleanCompany));
-    console.log('  Title:', JSON.stringify(cleanTitle));
-    console.log('  Industry:', JSON.stringify(cleanIndustry));
-    console.log('  Website:', JSON.stringify(cleanWebsite));
-    console.log('  Notes:', JSON.stringify(cleanNotes));
+    console.log('  Email (validated):', JSON.stringify(cleanEmail));
+    console.log('  Phone (formatted):', JSON.stringify(cleanPhone));
+    console.log('  Phone2 (formatted):', JSON.stringify(cleanPhone2));
+    console.log('  Company (cleaned):', JSON.stringify(cleanCompany));
+    console.log('  Title (cleaned):', JSON.stringify(cleanTitle));
+    console.log('  Industry (cleaned):', JSON.stringify(cleanIndustry));
+    console.log('  Website (formatted):', JSON.stringify(cleanWebsite));
+    console.log('  Notes (cleaned):', JSON.stringify(cleanNotes));
 
     // Validate required fields
     if (!fullName && !cleanEmail && !cleanPhone && !cleanCompany) {
@@ -141,6 +232,26 @@ app.post('/process-card', async (req, res) => {
 
     console.log('✅ VALIDATION PASSED: At least one required field provided');
 
+    // Additional data quality checks and warnings
+    const warnings = [];
+    
+    if (cleanEmail && !cleanEmail.includes('@')) {
+      warnings.push('Email format may be invalid');
+    }
+    
+    if (cleanPhone && cleanPhone.length < 10) {
+      warnings.push('Phone number may be too short');
+    }
+    
+    if (cleanWebsite && !cleanWebsite.includes('.')) {
+      warnings.push('Website format may be invalid');
+    }
+    
+    if (warnings.length > 0) {
+      console.log('⚠️ DATA QUALITY WARNINGS:');
+      warnings.forEach(warning => console.log(`  - ${warning}`));
+    }
+
     // Prepare notes field with additional details
     const notesParts = [];
     if (cleanTitle) notesParts.push(`Title: ${cleanTitle}`);
@@ -151,20 +262,21 @@ app.post('/process-card', async (req, res) => {
     const combinedNotes = notesParts.join('\n');
     console.log('\n📝 COMBINED NOTES:', JSON.stringify(combinedNotes));
 
-    // Prepare final values for database
+    // Prepare final values for database with additional validation
     const finalValues = [
-      fullName.trim(),
-      cleanEmail.trim(),
-      cleanPhone.trim(),
-      cleanCompany.trim(),
-      cleanWebsite.trim(),
-      combinedNotes
+      fullName || '', // Ensure never null
+      cleanEmail || '',
+      cleanPhone || '',
+      cleanCompany || '',
+      cleanWebsite || '',
+      combinedNotes || ''
     ];
 
     console.log('\n🎯 FINAL VALUES FOR DATABASE:');
     finalValues.forEach((value, index) => {
       const fields = ['full_name', 'email', 'phone', 'company_name', 'website', 'notes'];
-      console.log(`  $${index + 1} (${fields[index]}): "${value}" (type: ${typeof value}, length: ${value?.length || 0})`);
+      const status = value ? '✅' : '⭕';
+      console.log(`  ${status} $${index + 1} (${fields[index]}): "${value}" (type: ${typeof value}, length: ${value?.length || 0})`);
     });
 
     // Insert into database
@@ -200,18 +312,27 @@ app.post('/process-card', async (req, res) => {
         id: savedCard.id,
         timestamp: savedCard.dt,
         data: {
-          fullName: fullName.trim(),
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          email: cleanEmail.trim(),
-          phone: cleanPhone.trim(),
-          phone2: cleanPhone2.trim(),
-          company: cleanCompany.trim(),
-          website: cleanWebsite.trim(),
-          title: cleanTitle.trim(),
-          industry: cleanIndustry.trim(),
-          notes: cleanNotes.trim(),
+          fullName: fullName,
+          firstName: firstName,
+          lastName: lastName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          phone2: cleanPhone2,
+          company: cleanCompany,
+          website: cleanWebsite,
+          title: cleanTitle,
+          industry: cleanIndustry,
+          notes: cleanNotes,
           combinedNotes: combinedNotes
+        },
+        validation: {
+          warnings: warnings.length > 0 ? warnings : undefined,
+          cleaned: {
+            nameFormatted: firstName !== (Name || name || '') || lastName !== (Surname || surname || ''),
+            emailValidated: cleanEmail !== (Email || email || ''),
+            phoneFormatted: cleanPhone !== (Phone || phone || ''),
+            websiteFormatted: cleanWebsite !== (Website || website || ''),
+          }
         }
       };
 
