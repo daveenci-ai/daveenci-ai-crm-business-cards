@@ -372,11 +372,15 @@ app.post('/contacts', authenticateToken, async (req, res) => {
     console.log('📥 Raw request body:', JSON.stringify(req.body, null, 2));
     console.log('👤 User ID from token:', req.user.userId);
     
+    // Handle nested data structure from iPhone Shortcut (data might be under empty key "")
+    const dataSource = req.body[""] || req.body;
+    console.log('📊 Data source after extraction:', JSON.stringify(dataSource, null, 2));
+    
     const {
       name, email, phone, company, source, status = 'PROSPECT', notes,
       // Legacy field names for backward compatibility
       Name, Surname, Email, Phone, Company, Notes, Title, Industry, Website
-    } = req.body;
+    } = dataSource;
 
     // Clean and validate data using utility functions
     // Handle Name + Surname combination for legacy compatibility
