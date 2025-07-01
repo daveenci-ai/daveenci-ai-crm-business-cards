@@ -375,20 +375,35 @@ app.post('/contacts', authenticateToken, async (req, res) => {
     const {
       name, email, phone, company, source, status = 'PROSPECT', notes,
       // Legacy field names for backward compatibility
-      Name, Email, Phone, Company, Notes
+      Name, Surname, Email, Phone, Company, Notes, Title, Industry, Website
     } = req.body;
 
     // Clean and validate data using utility functions
-    const cleanedName = cleanName(name || Name || '');
+    // Handle Name + Surname combination for legacy compatibility
+    const firstName = cleanName(Name || name || '');
+    const lastName = cleanName(Surname || '');
+    const fullName = `${firstName} ${lastName}`.trim() || cleanName(name || '');
+    
     const validatedEmail = validateEmail(email || Email || '');
     const formattedPhone = formatPhoneNumber(phone || Phone || '');
     const cleanedCompany = cleanText(company || Company || '');
     const cleanedSource = cleanText(source || '');
-    const cleanedNotes = cleanSimpleText(notes || Notes || '');
+    
+    // Handle additional legacy fields in notes
+    const additionalNotes = [];
+    if (Title) additionalNotes.push(`Title: ${cleanText(Title)}`);
+    if (Industry) additionalNotes.push(`Industry: ${cleanText(Industry)}`); 
+    if (Website) additionalNotes.push(`Website: ${cleanWebsite(Website)}`);
+    if (Notes) additionalNotes.push(`Notes: ${cleanSimpleText(Notes)}`);
+    if (notes) additionalNotes.push(cleanSimpleText(notes));
+    
+    const cleanedNotes = additionalNotes.join('\n');
     const contactStatus = status.toUpperCase();
 
     console.log('\n✨ CLEANED & VALIDATED DATA:');
-    console.log('  Name:', JSON.stringify(cleanedName));
+    console.log('  Full Name:', JSON.stringify(fullName));
+    console.log('  First Name:', JSON.stringify(firstName));
+    console.log('  Last Name:', JSON.stringify(lastName));
     console.log('  Email:', JSON.stringify(validatedEmail));
     console.log('  Phone:', JSON.stringify(formattedPhone));
     console.log('  Company:', JSON.stringify(cleanedCompany));
@@ -397,7 +412,7 @@ app.post('/contacts', authenticateToken, async (req, res) => {
     console.log('  Notes:', JSON.stringify(cleanedNotes));
 
     // Validate required fields
-    if (!cleanedName && !validatedEmail && !formattedPhone && !cleanedCompany) {
+    if (!fullName && !validatedEmail && !formattedPhone && !cleanedCompany) {
       console.log('❌ VALIDATION FAILED: No name, email, phone, or company provided');
       return res.status(400).json({
         error: 'At least one of name, email, phone, or company is required'
@@ -426,7 +441,7 @@ app.post('/contacts', authenticateToken, async (req, res) => {
       `;
 
       const finalValues = [
-        cleanedName || '',
+        fullName || '',
         validatedEmail || '',
         formattedPhone || '',
         cleanedCompany || '',
@@ -457,7 +472,7 @@ app.post('/contacts', authenticateToken, async (req, res) => {
         created_at: savedContact.created_at,
         updated_at: savedContact.updated_at,
         data: {
-          name: cleanedName,
+          name: fullName,
           email: validatedEmail,
           phone: formattedPhone,
           company: cleanedCompany,
