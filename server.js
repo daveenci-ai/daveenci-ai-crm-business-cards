@@ -273,11 +273,11 @@ app.post('/register', async (req, res) => {
       
       const user = result.rows[0];
       
-      // Generate JWT token
+      // Generate JWT token (longer expiry for iPhone Shortcuts)
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: '30d' } // 30 days instead of 24 hours
       );
       
       res.status(201).json({
@@ -335,11 +335,11 @@ app.post('/login', async (req, res) => {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
       
-      // Generate JWT token
+      // Generate JWT token (longer expiry for iPhone Shortcuts)
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: '30d' } // 30 days instead of 24 hours
       );
       
       res.json({
