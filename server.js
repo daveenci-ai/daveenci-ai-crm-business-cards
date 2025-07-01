@@ -493,6 +493,36 @@ app.post('/process-card', authenticateToken, async (req, res) => {
   return app._router.handle({ ...req, url: '/contacts', method: 'POST' }, res);
 });
 
+// TEMPORARY: Test endpoint without authentication for iPhone Shortcut testing
+app.post('/test-card', async (req, res) => {
+  try {
+    console.log('\n🧪 === TEMPORARY TEST ENDPOINT (NO AUTH) ===');
+    console.log('📥 Raw request body:', JSON.stringify(req.body, null, 2));
+    
+    // For testing, just return success with the data received
+    res.json({
+      message: 'Test endpoint working! Data received successfully.',
+      warning: 'This is a temporary test endpoint without authentication.',
+      received_data: req.body,
+      timestamp: new Date().toISOString(),
+      next_steps: [
+        'Your shortcut is reaching the server correctly',
+        'Now you need to set up authentication',
+        'Use /register to create a user account',
+        'Use /login to get a JWT token',
+        'Add Authorization header to your shortcut'
+      ]
+    });
+    
+  } catch (error) {
+    console.error('❌ Test endpoint error:', error);
+    res.status(500).json({
+      error: 'Test endpoint failed',
+      details: error.message
+    });
+  }
+});
+
 // Get all contacts for authenticated user
 app.get('/contacts', authenticateToken, async (req, res) => {
   try {
