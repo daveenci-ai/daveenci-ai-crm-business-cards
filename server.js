@@ -277,7 +277,7 @@ app.post('/register', async (req, res) => {
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         JWT_SECRET,
-        { expiresIn: '30d' } // 30 days instead of 24 hours
+        { expiresIn: '90d' } // 3 months for iPhone Shortcuts
       );
       
       res.status(201).json({
@@ -339,7 +339,7 @@ app.post('/login', async (req, res) => {
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         JWT_SECRET,
-        { expiresIn: '30d' } // 30 days instead of 24 hours
+        { expiresIn: '90d' } // 3 months for iPhone Shortcuts
       );
       
       res.json({
