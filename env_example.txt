@@ -1,6 +1,9 @@
 # Database Configuration (Required)
 DATABASE_URL=postgresql://username:password@hostname:port/database_name
 
+# JWT Authentication (Required for production)
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
 # Node.js Configuration
 NODE_ENV=production
 PORT=5000 
