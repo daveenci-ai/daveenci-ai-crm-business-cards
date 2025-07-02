@@ -508,8 +508,126 @@ app.post('/contacts', authenticateToken, async (req, res) => {
 
 // Legacy endpoint for backward compatibility
 app.post('/process-card', authenticateToken, async (req, res) => {
-  // Redirect to new contacts endpoint
-  return app._router.handle({ ...req, url: '/contacts', method: 'POST' }, res);
+  // Just reuse the contacts logic directly - this is more reliable than internal redirects
+  try {
+    console.log('\n🔍 === LEGACY PROCESS-CARD ENDPOINT ===');
+    console.log('📥 Raw request body:', JSON.stringify(req.body, null, 2));
+    console.log('👤 User ID from token:', req.user.userId);
+    
+    // Handle nested data structure from iPhone Shortcut (data might be under empty key "")
+    const dataSource = req.body[""] || req.body;
+    console.log('📊 Data source after extraction:', JSON.stringify(dataSource, null, 2));
+    
+    const {
+      name, email, phone, company, source, status = 'PROSPECT', notes,
+      // Legacy field names for backward compatibility
+      Name, Surname, Email, Phone, Company, Notes, Title, Industry, Website
+    } = dataSource;
+
+    // Clean and validate data using utility functions
+    // Handle Name + Surname combination for legacy compatibility
+    const firstName = cleanName(Name || name || '');
+    const lastName = cleanName(Surname || '');
+    const fullName = `${firstName} ${lastName}`.trim() || cleanName(name || '');
+    
+    const validatedEmail = validateEmail(email || Email || '');
+    const formattedPhone = formatPhoneNumber(phone || Phone || '');
+    const cleanedCompany = cleanText(company || Company || '');
+    const cleanedSource = cleanText(source || '');
+    
+    // Handle additional legacy fields in notes
+    const additionalNotes = [];
+    if (Title) additionalNotes.push(`Title: ${cleanText(Title)}`);
+    if (Industry) additionalNotes.push(`Industry: ${cleanText(Industry)}`); 
+    if (Website) additionalNotes.push(`Website: ${cleanWebsite(Website)}`);
+    if (Notes) additionalNotes.push(`Notes: ${cleanSimpleText(Notes)}`);
+    if (notes) additionalNotes.push(cleanSimpleText(notes));
+    
+    const cleanedNotes = additionalNotes.join('\n');
+    const contactStatus = status.toUpperCase();
+
+    console.log('\n✨ CLEANED & VALIDATED DATA:');
+    console.log('  Full Name:', JSON.stringify(fullName));
+    console.log('  Email:', JSON.stringify(validatedEmail));
+    console.log('  Phone:', JSON.stringify(formattedPhone));
+    console.log('  Company:', JSON.stringify(cleanedCompany));
+
+    // Validate required fields
+    if (!fullName && !validatedEmail && !formattedPhone && !cleanedCompany) {
+      console.log('❌ VALIDATION FAILED: No name, email, phone, or company provided');
+      return res.status(400).json({
+        error: 'At least one of name, email, phone, or company is required'
+      });
+    }
+
+    console.log('✅ VALIDATION PASSED');
+
+    // Validate status enum
+    const validStatuses = ['PROSPECT', 'LEAD', 'CUSTOMER', 'INACTIVE'];
+    if (!validStatuses.includes(contactStatus)) {
+      return res.status(400).json({
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    const client = await pool.connect();
+    console.log('✅ DATABASE CONNECTION ESTABLISHED');
+    
+    try {
+      const insertQuery = `
+        INSERT INTO contacts 
+        (name, email, phone, company, source, status, notes, user_id, updated_at) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        RETURNING id, created_at, updated_at;
+      `;
+
+      const finalValues = [
+        fullName || '',
+        validatedEmail || '',
+        formattedPhone || '',
+        cleanedCompany || '',
+        cleanedSource || '',
+        contactStatus,
+        cleanedNotes || '',
+        req.user.userId
+      ];
+
+      console.log('\n⚡ EXECUTING QUERY...');
+      const result = await client.query(insertQuery, finalValues);
+      
+      const savedContact = result.rows[0];
+      console.log('\n🎉 SUCCESS! Legacy endpoint working');
+      console.log(`✅ Successfully saved contact with ID: ${savedContact.id}`);
+
+      res.status(201).json({
+        message: 'Business card saved successfully',
+        id: savedContact.id,
+        created_at: savedContact.created_at,
+        updated_at: savedContact.updated_at,
+        data: {
+          name: fullName,
+          email: validatedEmail,
+          phone: formattedPhone,
+          company: cleanedCompany,
+          source: cleanedSource,
+          status: contactStatus,
+          notes: cleanedNotes,
+          user_id: req.user.userId
+        }
+      });
+
+    } finally {
+      console.log('🔌 RELEASING DATABASE CONNECTION');
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Legacy endpoint error:', error);
+    res.status(500).json({
+      error: 'Failed to process business card',
+      details: error.message
+    });
+  }
 });
 
 // TEMPORARY: Test endpoint without authentication for iPhone Shortcut testing
@@ -621,7 +739,7 @@ app.get('/contacts', authenticateToken, async (req, res) => {
 // Legacy endpoint for backward compatibility
 app.get('/cards', authenticateToken, async (req, res) => {
   // Redirect to new contacts endpoint
-  return app._router.handle({ ...req, url: '/contacts', method: 'GET' }, res);
+  res.redirect(308, '/contacts');
 });
 
 // Get single contact by ID for authenticated user
@@ -666,7 +784,7 @@ app.get('/contacts/:id', authenticateToken, async (req, res) => {
 // Legacy endpoint for backward compatibility
 app.get('/cards/:id', authenticateToken, async (req, res) => {
   // Redirect to new contacts endpoint
-  return app._router.handle({ ...req, url: `/contacts/${req.params.id}`, method: 'GET' }, res);
+  res.redirect(308, `/contacts/${req.params.id}`);
 });
 
 // Update contact by ID for authenticated user
@@ -831,7 +949,7 @@ app.delete('/contacts/:id', authenticateToken, async (req, res) => {
 // Legacy endpoint for backward compatibility
 app.delete('/cards/:id', authenticateToken, async (req, res) => {
   // Redirect to new contacts endpoint
-  return app._router.handle({ ...req, url: `/contacts/${req.params.id}`, method: 'DELETE' }, res);
+  res.redirect(308, `/contacts/${req.params.id}`);
 });
 
 // Get current user profile
@@ -933,6 +1051,36 @@ app.put('/profile', authenticateToken, async (req, res) => {
       });
     }
   }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
+
+// Handle 404s
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl,
+    method: req.method,
+    available_endpoints: [
+      'POST /register',
+      'POST /login', 
+      'GET /profile',
+      'PUT /profile',
+      'POST /contacts',
+      'GET /contacts',
+      'GET /contacts/:id',
+      'PUT /contacts/:id',
+      'DELETE /contacts/:id',
+      'GET /'
+    ]
+  });
 });
 
 // Graceful shutdown
