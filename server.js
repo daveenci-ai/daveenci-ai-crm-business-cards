@@ -533,7 +533,7 @@ app.post('/process-card', authenticateToken, async (req, res) => {
     const validatedEmail = validateEmail(email || Email || '');
     const formattedPhone = formatPhoneNumber(phone || Phone || '');
     const cleanedCompany = cleanText(company || Company || '');
-    const cleanedSource = cleanText(source || '');
+    const cleanedSource = cleanText(source || '') || 'Business Card Scan';
     
     // Handle additional legacy fields in notes
     const additionalNotes = [];
