@@ -521,7 +521,7 @@ app.post('/process-card', authenticateToken, async (req, res) => {
     const {
       name, email, phone, company, source, status = 'PROSPECT', notes,
       // Legacy field names for backward compatibility
-      Name, Surname, Email, Phone, Company, Notes, Title, Industry, Website
+      Name, Surname, Email, Phone, Company, Notes, Title, Industry, Website, ScannedBy
     } = dataSource;
 
     // Clean and validate data using utility functions
@@ -551,6 +551,10 @@ app.post('/process-card', authenticateToken, async (req, res) => {
     console.log('  Email:', JSON.stringify(validatedEmail));
     console.log('  Phone:', JSON.stringify(formattedPhone));
     console.log('  Company:', JSON.stringify(cleanedCompany));
+    
+    // Handle ScannedBy user lookup
+    const scannedBy = cleanSimpleText(ScannedBy || '');
+    console.log('  ScannedBy:', JSON.stringify(scannedBy));
 
     // Validate required fields
     if (!fullName && !validatedEmail && !formattedPhone && !cleanedCompany) {
@@ -581,6 +585,27 @@ app.post('/process-card', authenticateToken, async (req, res) => {
         RETURNING id, created_at, updated_at;
       `;
 
+      // Look up user by ScannedBy name if provided
+      let targetUserId = req.user.userId; // Default to authenticated user
+      
+      if (scannedBy && (scannedBy.toLowerCase() === 'anton' || scannedBy.toLowerCase() === 'astrid')) {
+        console.log(`🔍 Looking up user by name: ${scannedBy}`);
+        
+        const userLookup = await client.query(
+          'SELECT id, name FROM users WHERE LOWER(name) LIKE $1',
+          [`%${scannedBy.toLowerCase()}%`]
+        );
+        
+        if (userLookup.rows.length > 0) {
+          targetUserId = userLookup.rows[0].id;
+          console.log(`✅ Found user: ${userLookup.rows[0].name} (ID: ${targetUserId})`);
+        } else {
+          console.log(`⚠️ User not found for ScannedBy: ${scannedBy}, using authenticated user`);
+        }
+      } else if (scannedBy) {
+        console.log(`⚠️ ScannedBy value "${scannedBy}" not recognized (expected Anton or Astrid), using authenticated user`);
+      }
+
       const finalValues = [
         fullName || '',
         validatedEmail || '',
@@ -589,7 +614,7 @@ app.post('/process-card', authenticateToken, async (req, res) => {
         cleanedSource || '',
         contactStatus,
         cleanedNotes || '',
-        req.user.userId
+        targetUserId
       ];
 
       console.log('\n⚡ EXECUTING QUERY...');
@@ -612,7 +637,8 @@ app.post('/process-card', authenticateToken, async (req, res) => {
           source: cleanedSource,
           status: contactStatus,
           notes: cleanedNotes,
-          user_id: req.user.userId
+          user_id: targetUserId,
+          scanned_by: scannedBy
         }
       });
 
