@@ -277,7 +277,7 @@ app.post('/register', async (req, res) => {
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         JWT_SECRET,
-        { expiresIn: '90d' } // 3 months for iPhone Shortcuts
+        { expiresIn: '180d' } // 6 months for iPhone Shortcuts
       );
       
       res.status(201).json({
@@ -339,7 +339,7 @@ app.post('/login', async (req, res) => {
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         JWT_SECRET,
-        { expiresIn: '90d' } // 3 months for iPhone Shortcuts
+        { expiresIn: '180d' } // 6 months for iPhone Shortcuts
       );
       
       res.json({
@@ -1101,7 +1101,7 @@ app.get('/admin/generate-token', async (req, res) => {
       const token = jwt.sign(
         { userId: user.id, email: user.email, name: user.name },
         JWT_SECRET,
-        { expiresIn: '90d' }
+        { expiresIn: '180d' }
       );
       
       console.log('✅ Token generated successfully');
@@ -1115,7 +1115,7 @@ app.get('/admin/generate-token', async (req, res) => {
         },
         token: token,
         authorization_header: `Bearer ${token}`,
-        expires_in: '90 days',
+        expires_in: '6 months (180 days)',
         instructions: [
           'Copy the token above',
           'In your iPhone shortcut, add an Authorization header',
