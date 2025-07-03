@@ -439,16 +439,22 @@ app.post('/contacts', authenticateToken, async (req, res) => {
     try {
       const insertQuery = `
         INSERT INTO contacts 
-        (name, email, phone, company, source, status, notes, user_id, updated_at) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        (name, primary_email, primary_phone, company, industry, website, source, status, notes, user_id, updated_at) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
         RETURNING id, created_at, updated_at;
       `;
+
+      // Extract additional fields from the data
+      const cleanedIndustry = cleanText(dataSource.Industry || '');
+      const cleanedWebsite = cleanWebsite(dataSource.Website || '');
 
       const finalValues = [
         fullName || '',
         validatedEmail || '',
         formattedPhone || '',
         cleanedCompany || '',
+        cleanedIndustry || '',
+        cleanedWebsite || '',
         cleanedSource || '',
         contactStatus,
         cleanedNotes || '',
@@ -580,15 +586,19 @@ app.post('/process-card', authenticateToken, async (req, res) => {
     try {
       const insertQuery = `
         INSERT INTO contacts 
-        (name, email, phone, company, source, status, notes, user_id, updated_at) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        (name, primary_email, primary_phone, company, industry, website, source, status, notes, user_id, updated_at) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
         RETURNING id, created_at, updated_at;
       `;
+
+      // Extract additional fields from the data
+      const cleanedIndustry = cleanText(dataSource.Industry || '');
+      const cleanedWebsite = cleanWebsite(dataSource.Website || '');
 
       // Look up user by ScannedBy name if provided
       let targetUserId = req.user.userId; // Default to authenticated user
       
-      if (scannedBy && (scannedBy.toLowerCase() === 'anton' || scannedBy.toLowerCase() === 'astrid')) {
+      if (scannedBy && (scannedBy.toLowerCase() === 'anton' || scannedBy.toLowerCase() === 'astrid' || scannedBy.toLowerCase() === 'admin')) {
         console.log(`🔍 Looking up user by name: ${scannedBy}`);
         
         const userLookup = await client.query(
@@ -603,7 +613,7 @@ app.post('/process-card', authenticateToken, async (req, res) => {
           console.log(`⚠️ User not found for ScannedBy: ${scannedBy}, using authenticated user`);
         }
       } else if (scannedBy) {
-        console.log(`⚠️ ScannedBy value "${scannedBy}" not recognized (expected Anton or Astrid), using authenticated user`);
+        console.log(`⚠️ ScannedBy value "${scannedBy}" not recognized (expected Anton, Astrid, or Admin), using authenticated user`);
       }
 
       const finalValues = [
@@ -611,6 +621,8 @@ app.post('/process-card', authenticateToken, async (req, res) => {
         validatedEmail || '',
         formattedPhone || '',
         cleanedCompany || '',
+        cleanedIndustry || '',
+        cleanedWebsite || '',
         cleanedSource || '',
         contactStatus,
         cleanedNotes || '',
@@ -694,7 +706,7 @@ app.get('/contacts', authenticateToken, async (req, res) => {
     const client = await pool.connect();
     try {
       let query = `
-        SELECT id, name, email, phone, company, source, status, notes, 
+        SELECT id, name, primary_email as email, primary_phone as phone, company, industry, website, source, status, notes, 
                created_at, updated_at
         FROM contacts 
         WHERE user_id = $1
@@ -712,7 +724,7 @@ app.get('/contacts', authenticateToken, async (req, res) => {
       // Add search filter
       if (search) {
         paramCount++;
-        query += ` AND (name ILIKE $${paramCount} OR email ILIKE $${paramCount} OR company ILIKE $${paramCount})`;
+        query += ` AND (name ILIKE $${paramCount} OR primary_email ILIKE $${paramCount} OR company ILIKE $${paramCount})`;
         params.push(`%${search}%`);
       }
 
@@ -734,7 +746,7 @@ app.get('/contacts', authenticateToken, async (req, res) => {
 
       if (search) {
         countParamCount++;
-        countQuery += ` AND (name ILIKE $${countParamCount} OR email ILIKE $${countParamCount} OR company ILIKE $${countParamCount})`;
+        countQuery += ` AND (name ILIKE $${countParamCount} OR primary_email ILIKE $${countParamCount} OR company ILIKE $${countParamCount})`;
         countParams.push(`%${search}%`);
       }
 
@@ -780,7 +792,7 @@ app.get('/contacts/:id', authenticateToken, async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query(`
-        SELECT id, name, email, phone, company, source, status, notes,
+        SELECT id, name, primary_email as email, primary_phone as phone, company, industry, website, source, status, notes,
                created_at, updated_at
         FROM contacts WHERE id = $1 AND user_id = $2
       `, [contactId, req.user.userId]);
@@ -857,12 +869,12 @@ app.put('/contacts/:id', authenticateToken, async (req, res) => {
       }
       if (validatedEmail) {
         paramCount++;
-        updates.push(`email = $${paramCount}`);
+        updates.push(`primary_email = $${paramCount}`);
         values.push(validatedEmail);
       }
       if (formattedPhone) {
         paramCount++;
-        updates.push(`phone = $${paramCount}`);
+        updates.push(`primary_phone = $${paramCount}`);
         values.push(formattedPhone);
       }
       if (cleanedCompany) {
