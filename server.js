@@ -65,6 +65,28 @@ async function connectDB() {
       console.log('Warning: contacts table not found!');
     }
     
+    // Check status enum values
+    try {
+      const enumCheck = await client.query(`
+        SELECT enumlabel as value 
+        FROM pg_enum e 
+        JOIN pg_type t ON e.enumtypid = t.oid 
+        WHERE t.typname = 'status'
+        ORDER BY e.enumsortorder;
+      `);
+      
+      if (enumCheck.rows.length > 0) {
+        console.log('Found status enum values:');
+        enumCheck.rows.forEach(row => {
+          console.log(`  - ${row.value}`);
+        });
+      } else {
+        console.log('Warning: status enum not found!');
+      }
+    } catch (enumErr) {
+      console.log('Could not check enum values:', enumErr.message);
+    }
+    
     client.release();
   } catch (err) {
     console.error('Database connection error:', err);
@@ -402,7 +424,8 @@ app.post('/contacts', authenticateToken, async (req, res) => {
     if (notes) additionalNotes.push(cleanSimpleText(notes));
     
     const cleanedNotes = additionalNotes.join('\n');
-    const contactStatus = status.toUpperCase();
+    // Use correct enum value from database
+    const contactStatus = (status || 'PROSPECTS').toUpperCase();
 
     console.log('\n✨ CLEANED & VALIDATED DATA:');
     console.log('  Full Name:', JSON.stringify(fullName));
@@ -425,8 +448,8 @@ app.post('/contacts', authenticateToken, async (req, res) => {
 
     console.log('✅ VALIDATION PASSED');
 
-    // Validate status enum
-    const validStatuses = ['PROSPECT', 'LEAD', 'CUSTOMER', 'INACTIVE'];
+    // Validate status enum using actual database values
+    const validStatuses = ['PROSPECTS', 'QUALIFIED_LEADS', 'OPPORTUNITIES', 'CONVERTED_CLIENTS', 'DISQUALIFIED_LEADS', 'DECLINED_OPPORTUNITIES', 'CHURNED_CLIENTS'];
     if (!validStatuses.includes(contactStatus)) {
       return res.status(400).json({
         error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
@@ -525,7 +548,7 @@ app.post('/process-card', authenticateToken, async (req, res) => {
     console.log('📊 Data source after extraction:', JSON.stringify(dataSource, null, 2));
     
     const {
-      name, email, phone, company, source, status = 'PROSPECT', notes,
+      name, email, phone, company, source, status = 'PROSPECTS', notes,
       // Legacy field names for backward compatibility
       Name, Surname, Email, Phone, Company, Notes, Title, Industry, Website, ScannedBy
     } = dataSource;
@@ -550,7 +573,8 @@ app.post('/process-card', authenticateToken, async (req, res) => {
     if (notes) additionalNotes.push(cleanSimpleText(notes));
     
     const cleanedNotes = additionalNotes.join('\n');
-    const contactStatus = status.toUpperCase();
+    // Use correct enum value from database
+    const contactStatus = 'PROSPECTS'; // Default status for business cards
 
     console.log('\n✨ CLEANED & VALIDATED DATA:');
     console.log('  Full Name:', JSON.stringify(fullName));
@@ -572,8 +596,8 @@ app.post('/process-card', authenticateToken, async (req, res) => {
 
     console.log('✅ VALIDATION PASSED');
 
-    // Validate status enum
-    const validStatuses = ['PROSPECT', 'LEAD', 'CUSTOMER', 'INACTIVE'];
+    // Validate status enum using actual database values
+    const validStatuses = ['PROSPECTS', 'QUALIFIED_LEADS', 'OPPORTUNITIES', 'CONVERTED_CLIENTS', 'DISQUALIFIED_LEADS', 'DECLINED_OPPORTUNITIES', 'CHURNED_CLIENTS'];
     if (!validStatuses.includes(contactStatus)) {
       return res.status(400).json({
         error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
@@ -847,7 +871,7 @@ app.put('/contacts/:id', authenticateToken, async (req, res) => {
 
     // Validate status if provided
     if (contactStatus) {
-      const validStatuses = ['PROSPECT', 'LEAD', 'CUSTOMER', 'INACTIVE'];
+      const validStatuses = ['PROSPECTS', 'QUALIFIED_LEADS', 'OPPORTUNITIES', 'CONVERTED_CLIENTS', 'DISQUALIFIED_LEADS', 'DECLINED_OPPORTUNITIES', 'CHURNED_CLIENTS'];
       if (!validStatuses.includes(contactStatus)) {
         return res.status(400).json({
           error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
@@ -1088,6 +1112,47 @@ app.put('/profile', authenticateToken, async (req, res) => {
         details: error.message
       });
     }
+  }
+});
+
+// TEMPORARY: Check database enum values
+app.get('/admin/check-enums', async (req, res) => {
+  try {
+    console.log('🔍 Admin endpoint: Checking database enum values...');
+    
+    const client = await pool.connect();
+    try {
+      const enumCheck = await client.query(`
+        SELECT enumlabel as value 
+        FROM pg_enum e 
+        JOIN pg_type t ON e.enumtypid = t.oid 
+        WHERE t.typname = 'status'
+        ORDER BY e.enumsortorder;
+      `);
+      
+      console.log('✅ Enum values retrieved');
+      
+      res.json({
+        message: 'Status enum values retrieved successfully',
+        enum_values: enumCheck.rows.map(row => row.value),
+        current_code_expects: ['PROSPECT', 'LEAD', 'CUSTOMER', 'INACTIVE'],
+        instructions: [
+          'Check if the actual enum values match what the code expects',
+          'If not, we need to update the validation arrays in the code',
+          'Or update the database enum to match the code'
+        ]
+      });
+      
+    } finally {
+      client.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error checking enum values:', error);
+    res.status(500).json({
+      error: 'Failed to check enum values',
+      details: error.message
+    });
   }
 });
 
