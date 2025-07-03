@@ -1079,6 +1079,65 @@ app.put('/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// TEMPORARY: Generate JWT token for iPhone shortcut (remove after use)
+app.get('/admin/generate-token', async (req, res) => {
+  try {
+    console.log('🔐 Admin endpoint: Generating JWT token...');
+    
+    const client = await pool.connect();
+    try {
+      const result = await client.query('SELECT id, email, name FROM users ORDER BY created_at LIMIT 1');
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          error: 'No users found',
+          message: 'Create a user account first with POST /register'
+        });
+      }
+      
+      const user = result.rows[0];
+      console.log(`👤 Generating token for: ${user.name} (${user.email})`);
+      
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '90d' }
+      );
+      
+      console.log('✅ Token generated successfully');
+      
+      res.json({
+        message: 'JWT token generated successfully',
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email
+        },
+        token: token,
+        authorization_header: `Bearer ${token}`,
+        expires_in: '90 days',
+        instructions: [
+          'Copy the token above',
+          'In your iPhone shortcut, add an Authorization header',
+          'Set the header value to: Bearer [token]',
+          'Use the /process-card endpoint',
+          'Remove this admin endpoint after use'
+        ]
+      });
+      
+    } finally {
+      client.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error generating token:', error);
+    res.status(500).json({
+      error: 'Failed to generate token',
+      details: error.message
+    });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Global error handler:', err);
