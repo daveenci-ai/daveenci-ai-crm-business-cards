@@ -133,7 +133,6 @@ async function handleBusinessCardWebhook(event, context) {
  */
 async function validateGitHubWebhook(event) {
   try {
-    const body = JSON.parse(event.body);
     const signature = event.headers['x-hub-signature-256'] || event.headers['X-Hub-Signature-256'];
     
     // Debug logging
@@ -145,7 +144,7 @@ async function validateGitHubWebhook(event) {
     console.log('- Body length:', event.body.length);
     console.log('- Body type:', typeof event.body);
     
-    // Verify webhook signature
+    // Verify webhook signature BEFORE parsing JSON
     if (!config.githubWebhookSecret || !signature) {
       console.log('❌ Missing webhook secret or signature');
       return { valid: false, error: 'Missing webhook secret or signature' };
@@ -164,6 +163,9 @@ async function validateGitHubWebhook(event) {
     }
     
     console.log('✅ Signature validation passed');
+    
+    // Now parse the JSON body after signature validation
+    const body = JSON.parse(event.body);
     
     // Check if it's a push event with new images
     if (event.headers['x-github-event'] !== 'push' || body.ref !== 'refs/heads/main') {
