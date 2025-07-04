@@ -143,6 +143,8 @@ async function validateGitHubWebhook(event) {
     console.log('- Signature value:', signature);
     console.log('- Body length:', event.body.length);
     console.log('- Body type:', typeof event.body);
+    console.log('- Body first 200 chars:', event.body.substring(0, 200));
+    console.log('- Body last 200 chars:', event.body.substring(event.body.length - 200));
     
     // Verify webhook signature BEFORE parsing JSON
     if (!config.githubWebhookSecret || !signature) {
@@ -151,8 +153,11 @@ async function validateGitHubWebhook(event) {
     }
     
     const hmac = crypto.createHmac('sha256', config.githubWebhookSecret);
-    const digest = 'sha256=' + hmac.update(event.body).digest('hex');
+    // Use raw Buffer if available, otherwise use string body
+    const bodyForSignature = event.rawBody || event.body;
+    const digest = 'sha256=' + hmac.update(bodyForSignature).digest('hex');
     
+    console.log('- Using raw buffer for signature:', !!event.rawBody);
     console.log('- Calculated digest:', digest);
     console.log('- Received signature:', signature);
     console.log('- Digests match:', digest === signature);

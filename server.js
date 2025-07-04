@@ -33,7 +33,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 // --- GITHUB WEBHOOK ENDPOINT ---
 app.post('/api/github-webhook', async (req, res) => {
   const event = {
-    body: req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body),
+    body: req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body),
+    rawBody: req.rawBody, // Pass the raw Buffer for signature validation
     headers: req.headers
   };
   try {
@@ -48,7 +49,8 @@ app.post('/api/github-webhook', async (req, res) => {
 // Optional: Alias for /api/webhook
 app.post('/api/webhook', async (req, res) => {
   const event = {
-    body: req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body),
+    body: req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body),
+    rawBody: req.rawBody, // Pass the raw Buffer for signature validation
     headers: req.headers
   };
   try {
