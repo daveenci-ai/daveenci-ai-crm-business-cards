@@ -50,23 +50,30 @@ const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
  */
 async function handleBusinessCardWebhook(event, context) {
   try {
-    console.log('🚀 Business Card Processing Pipeline Started');
+    console.log('🚀 STEP 1: Business Card Processing Pipeline Started');
+    console.log('⏰ Timestamp:', new Date().toISOString());
     
     // Step 1: Validate GitHub webhook
+    console.log('🔐 STEP 2: Validating GitHub webhook signature...');
     const webhookValidation = await validateGitHubWebhook(event);
     if (!webhookValidation.valid) {
+      console.log('❌ STEP 2 FAILED: Webhook validation failed -', webhookValidation.error);
       return {
         statusCode: 401,
         body: JSON.stringify({ error: 'Invalid webhook signature' })
       };
     }
+    console.log('✅ STEP 2 COMPLETE: Webhook signature validated successfully');
     
     const { imagePath, imageData } = webhookValidation;
-    console.log(`📸 Processing image: ${imagePath}`);
+    console.log(`📸 STEP 3: Image retrieved from GitHub - ${imagePath}`);
+    console.log(`📊 Image size: ${imageData.size} bytes, Content-Type: ${imageData.contentType}`);
     
     // Step 2: Extract data using Gemini
+    console.log('🤖 STEP 4: Starting Gemini AI data extraction...');
     const extractedData = await extractBusinessCardData(imageData);
     if (!extractedData.success) {
+      console.log('❌ STEP 4 FAILED: Data extraction failed -', extractedData.error);
       await sendTelegramError(`❌ Failed to extract data from business card: ${extractedData.error}`);
       return {
         statusCode: 400,
@@ -74,24 +81,40 @@ async function handleBusinessCardWebhook(event, context) {
       };
     }
     
-    console.log('✅ Data extraction completed:', extractedData.data.name);
+    console.log('✅ STEP 4 COMPLETE: Data extraction successful');
+    console.log('👤 Extracted contact:', extractedData.data.name);
+    console.log('🏢 Company:', extractedData.data.company);
+    console.log('📧 Email:', extractedData.data.primary_email);
+    console.log('📱 Phone:', extractedData.data.primary_phone);
     
     // Step 3: Validate extracted data
+    console.log('🔍 STEP 5: Validating extracted data...');
     const validation = validateExtractedData(extractedData.data);
     if (!validation.valid) {
+      console.log('❌ STEP 5 FAILED: Data validation failed -', validation.errors.join(', '));
       await sendTelegramError(`❌ Invalid data extracted: ${validation.errors.join(', ')}`);
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Data validation failed', details: validation.errors })
       };
     }
+    console.log('✅ STEP 5 COMPLETE: Data validation passed');
     
     // Step 4: Research using Gemini (do this before database operations for new contacts)
+    console.log('🧠 STEP 6: Starting AI research for contact and company...');
     const research = await performBusinessResearch(extractedData.data);
+    if (research.success) {
+      console.log('✅ STEP 6 COMPLETE: AI research completed successfully');
+      console.log('📄 Research length:', research.research.length, 'characters');
+    } else {
+      console.log('⚠️ STEP 6 WARNING: AI research failed -', research.error);
+    }
     
     // Step 5: Database operations (pass research data for new contacts)
+    console.log('💾 STEP 7: Starting database operations...');
     const dbResult = await handleDatabaseOperations(extractedData.data, research);
     if (!dbResult.success) {
+      console.log('❌ STEP 7 FAILED: Database operation failed -', dbResult.error);
       await sendTelegramError(`❌ Database operation failed: ${dbResult.error}`);
       return {
         statusCode: 500,
@@ -99,16 +122,21 @@ async function handleBusinessCardWebhook(event, context) {
       };
     }
     
-    console.log(`✅ Database operation completed: ${dbResult.isNewContact ? 'New contact' : 'Touchpoint added'}`);
+    console.log(`✅ STEP 7 COMPLETE: Database operation successful`);
+    console.log(`📊 Contact status: ${dbResult.isNewContact ? 'NEW CONTACT CREATED' : 'EXISTING CONTACT - TOUCHPOINT ADDED'}`);
+    console.log(`🆔 Contact ID: ${dbResult.contactId}`);
     
     // Step 6: Send Telegram notification (only for new contacts)
     if (dbResult.isNewContact) {
+      console.log('📱 STEP 8: Sending Telegram notification for new contact...');
       await sendTelegramNotification(extractedData.data, research, dbResult);
+      console.log('✅ STEP 8 COMPLETE: Telegram notification sent successfully');
     } else {
-      console.log('📱 Skipping Telegram notification for existing contact');
+      console.log('⏭️ STEP 8 SKIPPED: No Telegram notification for existing contact (touchpoint only)');
     }
     
-    console.log('🎉 Business card processing completed successfully');
+    console.log('🎉 PIPELINE COMPLETE: All steps finished successfully');
+    console.log('⏰ Completion time:', new Date().toISOString());
     
     return {
       statusCode: 200,
@@ -122,7 +150,9 @@ async function handleBusinessCardWebhook(event, context) {
     };
     
   } catch (error) {
-    console.error('❌ Pipeline error:', error);
+    console.error('❌ PIPELINE ERROR: Unexpected error at', new Date().toISOString());
+    console.error('❌ Error details:', error.message);
+    console.error('❌ Stack trace:', error.stack);
     await sendTelegramError(`❌ Business card processing failed: ${error.message}`);
     
     return {
@@ -264,9 +294,20 @@ async function extractBusinessCardData(imageData) {
 The JSON object must have these exact keys: name, company, title, primary_email, secondary_email, primary_phone, secondary_phone, website, address.
 
 Follow these rules:
-- If a field is not found, its value must be null.
-- If you find multiple emails or phones, identify the most likely personal email (e.g., @gmail.com, @yahoo.com) and assign it to primary_email. The corporate email should be secondary_email. If only one is found, use primary_email and set the other to null. Do the same for phone numbers if a distinction is clear.
-- Clean the data: format phone numbers consistently (e.g., +1-XXX-XXX-XXXX) and ensure the website includes 'http://' or 'https://'.
+- If a field is not found or unclear, use these exact fallback values:
+  * name: "Unknown Person" (if no name found)
+  * company: "Unknown Company" (if no company found)
+  * title: "Unknown Title" (if no title found)
+  * primary_email: "unknown@unknown.com" (if no email found)
+  * secondary_email: null (only if you find a second valid email)
+  * primary_phone: "0000000000" (if no phone found)
+  * secondary_phone: null (only if you find a second valid phone)
+  * website: "https://unknown.com" (if no website found)
+  * address: "Unknown Address" (if no address found)
+
+- If you find multiple emails or phones, identify the most likely personal email (e.g., @gmail.com, @yahoo.com) and assign it to primary_email. The corporate email should be secondary_email. If only one is found, use primary_email and set secondary_email to null.
+- Clean the data: format phone numbers as digits only (e.g., 5551234567) and ensure websites include 'https://'.
+- NEVER leave any field empty or with invalid data - always use the fallback values above.
 
 Here is the JSON structure to follow:
 {
@@ -274,9 +315,9 @@ Here is the JSON structure to follow:
   "company": "...",
   "title": "...",
   "primary_email": "...",
-  "secondary_email": "...",
+  "secondary_email": null,
   "primary_phone": "...",
-  "secondary_phone": "...",
+  "secondary_phone": null,
   "website": "...",
   "address": "..."
 }`;
@@ -300,9 +341,52 @@ Here is the JSON structure to follow:
     
     const extractedData = JSON.parse(jsonMatch[0]);
     
+    // Apply fallback values for any missing or invalid data
+    const cleanedData = {
+      name: extractedData.name || "Unknown Person",
+      company: extractedData.company || "Unknown Company", 
+      title: extractedData.title || "Unknown Title",
+      primary_email: extractedData.primary_email || "unknown@unknown.com",
+      secondary_email: extractedData.secondary_email || null,
+      primary_phone: extractedData.primary_phone || "0000000000",
+      secondary_phone: extractedData.secondary_phone || null,
+      website: extractedData.website || "https://unknown.com",
+      address: extractedData.address || "Unknown Address"
+    };
+    
+    // Validate and clean email fields
+    const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+    if (!emailRegex.test(cleanedData.primary_email)) {
+      cleanedData.primary_email = "unknown@unknown.com";
+    }
+    if (cleanedData.secondary_email && !emailRegex.test(cleanedData.secondary_email)) {
+      cleanedData.secondary_email = null;
+    }
+    
+    // Clean phone numbers (remove all non-digits)
+    if (cleanedData.primary_phone) {
+      cleanedData.primary_phone = cleanedData.primary_phone.replace(/\D/g, '');
+      if (cleanedData.primary_phone.length < 10) {
+        cleanedData.primary_phone = "0000000000";
+      }
+    }
+    if (cleanedData.secondary_phone) {
+      cleanedData.secondary_phone = cleanedData.secondary_phone.replace(/\D/g, '');
+      if (cleanedData.secondary_phone.length < 10) {
+        cleanedData.secondary_phone = null;
+      }
+    }
+    
+    // Ensure website has protocol
+    if (cleanedData.website && !cleanedData.website.startsWith('http')) {
+      cleanedData.website = 'https://' + cleanedData.website;
+    }
+    
+    console.log('🧹 Data cleaning: Applied fallback values and validation');
+    
     return {
       success: true,
-      data: extractedData
+      data: cleanedData
     };
     
   } catch (error) {
@@ -448,6 +532,8 @@ async function handleDatabaseOperations(contactData, research) {
  */
 async function performBusinessResearch(contactData) {
   try {
+    console.log('🔬 Research: Preparing AI prompt for', contactData.name, 'at', contactData.company);
+    
     const prompt = `You are a professional business research analyst. I just met a person and need a concise briefing to help me establish a strong connection.
 
 Person: ${contactData.name}
@@ -466,9 +552,14 @@ Provide a brief report formatted in Markdown with the following sections:
 
 Keep the entire report concise and easy to read on a mobile phone.`;
 
+    console.log('🤖 Research: Sending request to Gemini AI...');
     const result = await geminiModel.generateContent(prompt);
     const response = await result.response;
     const research = response.text();
+    
+    console.log('✅ Research: Gemini AI response received');
+    console.log('📝 Research: Generated', research.length, 'characters of research data');
+    console.log('🔍 Research preview:', research.substring(0, 150) + '...');
     
     return {
       success: true,
@@ -476,6 +567,7 @@ Keep the entire report concise and easy to read on a mobile phone.`;
     };
     
   } catch (error) {
+    console.log('❌ Research: Gemini AI request failed -', error.message);
     return {
       success: false,
       error: error.message,
@@ -489,6 +581,10 @@ Keep the entire report concise and easy to read on a mobile phone.`;
  */
 async function sendTelegramNotification(contactData, research, dbResult) {
   try {
+    console.log('📱 Telegram: Preparing notification message...');
+    console.log('📱 Telegram: Bot token configured:', !!config.telegramBotToken);
+    console.log('📱 Telegram: Chat ID configured:', !!config.telegramChatId);
+    
     const status = dbResult.isNewContact ? '✅ New contact added' : '🔄 Touchpoint added for existing contact';
     
     let message = `${status}: *${contactData.name}*\n`;
@@ -501,13 +597,19 @@ async function sendTelegramNotification(contactData, research, dbResult) {
     
     if (research.success) {
       message += research.research;
+      console.log('📱 Telegram: Including research data in message');
     } else {
       message += `⚠️ Research could not be completed: ${research.error}`;
+      console.log('📱 Telegram: Research failed, including error message');
     }
+    
+    console.log('📱 Telegram: Message length:', message.length, 'characters');
     
     // Escape special characters for MarkdownV2
     const escapedMessage = message
       .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    
+    console.log('📱 Telegram: Sending message to chat ID:', config.telegramChatId);
     
     await axios.post(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
       chat_id: config.telegramChatId,
@@ -515,10 +617,14 @@ async function sendTelegramNotification(contactData, research, dbResult) {
       parse_mode: 'MarkdownV2'
     });
     
-    console.log('📱 Telegram notification sent');
+    console.log('✅ Telegram: Message sent successfully');
     
   } catch (error) {
-    console.error('❌ Telegram notification failed:', error.message);
+    console.error('❌ Telegram: Failed to send notification -', error.message);
+    if (error.response) {
+      console.error('❌ Telegram: API response status:', error.response.status);
+      console.error('❌ Telegram: API response data:', error.response.data);
+    }
   }
 }
 
