@@ -143,6 +143,7 @@ async function validateGitHubWebhook(event) {
     console.log('- Signature value:', signature);
     console.log('- Body length:', event.body.length);
     console.log('- Body type:', typeof event.body);
+    console.log('- Has rawBody:', !!event.rawBody);
     console.log('- Body first 200 chars:', event.body.substring(0, 200));
     console.log('- Body last 200 chars:', event.body.substring(event.body.length - 200));
     
@@ -170,7 +171,21 @@ async function validateGitHubWebhook(event) {
     console.log('✅ Signature validation passed');
     
     // Now parse the JSON body after signature validation
-    const body = JSON.parse(event.body);
+    let body;
+    try {
+      // Check if body is wrapped in payload (form-encoded webhook)
+      const parsedBody = JSON.parse(event.body);
+      if (parsedBody.payload) {
+        console.log('📦 Detected form-encoded webhook payload');
+        body = JSON.parse(parsedBody.payload);
+      } else {
+        console.log('📦 Detected direct JSON webhook payload');
+        body = parsedBody;
+      }
+    } catch (error) {
+      console.log('❌ Error parsing webhook body:', error.message);
+      return { valid: false, error: 'Invalid JSON payload' };
+    }
     
     // Check if it's a push event with new images
     if (event.headers['x-github-event'] !== 'push' || body.ref !== 'refs/heads/main') {
