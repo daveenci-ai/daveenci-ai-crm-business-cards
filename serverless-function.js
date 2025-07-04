@@ -86,8 +86,11 @@ async function handleBusinessCardWebhook(event, context) {
       };
     }
     
-    // Step 4: Database operations
-    const dbResult = await handleDatabaseOperations(extractedData.data);
+    // Step 4: Research using Gemini (do this before database operations for new contacts)
+    const research = await performBusinessResearch(extractedData.data);
+    
+    // Step 5: Database operations (pass research data for new contacts)
+    const dbResult = await handleDatabaseOperations(extractedData.data, research);
     if (!dbResult.success) {
       await sendTelegramError(`❌ Database operation failed: ${dbResult.error}`);
       return {
@@ -98,11 +101,12 @@ async function handleBusinessCardWebhook(event, context) {
     
     console.log(`✅ Database operation completed: ${dbResult.isNewContact ? 'New contact' : 'Touchpoint added'}`);
     
-    // Step 5: Research using Gemini
-    const research = await performBusinessResearch(extractedData.data);
-    
-    // Step 6: Send Telegram notification
-    await sendTelegramNotification(extractedData.data, research, dbResult);
+    // Step 6: Send Telegram notification (only for new contacts)
+    if (dbResult.isNewContact) {
+      await sendTelegramNotification(extractedData.data, research, dbResult);
+    } else {
+      console.log('📱 Skipping Telegram notification for existing contact');
+    }
     
     console.log('🎉 Business card processing completed successfully');
     
@@ -352,7 +356,7 @@ function validateExtractedData(data) {
 /**
  * Handle database operations (check existing, insert contact or touchpoint)
  */
-async function handleDatabaseOperations(contactData) {
+async function handleDatabaseOperations(contactData, research) {
   const client = await pool.connect();
   
   try {
@@ -375,12 +379,14 @@ async function handleDatabaseOperations(contactData) {
     );
     
     if (existingContact.rows.length === 0) {
-      // Insert new contact
+      // Insert new contact with research data in notes
+      const notesWithResearch = research.success ? research.research : 'Research could not be completed at this time.';
+      
       const insertResult = await client.query(`
         INSERT INTO contacts (
           name, company, primary_email, secondary_email, primary_phone, secondary_phone,
-          website, address, source, status, user_id, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+          website, address, source, status, user_id, notes, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
         RETURNING id
       `, [
         contactData.name,
@@ -393,8 +399,11 @@ async function handleDatabaseOperations(contactData) {
         contactData.address,
         'Business Card Scan',
         'PROSPECTS',
-        userId
+        userId,
+        notesWithResearch
       ]);
+      
+      console.log('✅ New contact created with research data in notes');
       
       return {
         success: true,
@@ -403,11 +412,8 @@ async function handleDatabaseOperations(contactData) {
       };
       
     } else {
-      // Add touchpoint for existing contact
+      // Contact already exists - add touchpoint with IN_PERSON source
       const contactId = existingContact.rows[0].id;
-      
-      // Check if touchpoints table exists, if not create it
-      await createTouchpointsTableIfNotExists(client);
       
       await client.query(`
         INSERT INTO touchpoints (
@@ -415,9 +421,11 @@ async function handleDatabaseOperations(contactData) {
         ) VALUES ($1, $2, $3, NOW())
       `, [
         contactId,
-        `Met again / New business card scanned on ${new Date().toLocaleDateString()}`,
-        'BUSINESS_CARD'
+        `Business card scanned on ${new Date().toLocaleDateString()}`,
+        'IN_PERSON'
       ]);
+      
+      console.log('✅ Touchpoint added for existing contact');
       
       return {
         success: true,
@@ -433,24 +441,7 @@ async function handleDatabaseOperations(contactData) {
   }
 }
 
-/**
- * Create touchpoints table if it doesn't exist
- */
-async function createTouchpointsTableIfNotExists(client) {
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS touchpoints (
-        id SERIAL PRIMARY KEY,
-        contact_id INTEGER REFERENCES contacts(id) ON DELETE CASCADE,
-        note TEXT NOT NULL,
-        source VARCHAR(50) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-  } catch (error) {
-    console.log('Touchpoints table creation error (might already exist):', error.message);
-  }
-}
+
 
 /**
  * Perform business research using Gemini
