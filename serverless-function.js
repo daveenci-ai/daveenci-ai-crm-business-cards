@@ -134,19 +134,36 @@ async function handleBusinessCardWebhook(event, context) {
 async function validateGitHubWebhook(event) {
   try {
     const body = JSON.parse(event.body);
-    const signature = event.headers['x-hub-signature-256'];
+    const signature = event.headers['x-hub-signature-256'] || event.headers['X-Hub-Signature-256'];
+    
+    // Debug logging
+    console.log('🔍 Webhook signature validation:');
+    console.log('- All headers:', Object.keys(event.headers));
+    console.log('- Has webhook secret:', !!config.githubWebhookSecret);
+    console.log('- Has signature:', !!signature);
+    console.log('- Signature value:', signature);
+    console.log('- Body length:', event.body.length);
+    console.log('- Body type:', typeof event.body);
     
     // Verify webhook signature
     if (!config.githubWebhookSecret || !signature) {
+      console.log('❌ Missing webhook secret or signature');
       return { valid: false, error: 'Missing webhook secret or signature' };
     }
     
     const hmac = crypto.createHmac('sha256', config.githubWebhookSecret);
     const digest = 'sha256=' + hmac.update(event.body).digest('hex');
     
+    console.log('- Calculated digest:', digest);
+    console.log('- Received signature:', signature);
+    console.log('- Digests match:', digest === signature);
+    
     if (!crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature))) {
+      console.log('❌ Signature validation failed');
       return { valid: false, error: 'Invalid signature' };
     }
+    
+    console.log('✅ Signature validation passed');
     
     // Check if it's a push event with new images
     if (event.headers['x-github-event'] !== 'push' || body.ref !== 'refs/heads/main') {
