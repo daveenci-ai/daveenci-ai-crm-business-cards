@@ -4,6 +4,13 @@ DATABASE_URL=postgresql://username:password@hostname:port/database_name
 # JWT Authentication (Required for production)
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
+# Gemini AI Configuration (Required for AI research)
+GEMINI_API_KEY=your-gemini-api-key-from-google-ai-studio
+
+# Telegram Bot Configuration (Required for notifications)
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token-from-botfather
+TELEGRAM_CHAT_ID=your-telegram-chat-id-or-group-id
+
 # Node.js Configuration
 NODE_ENV=production
 PORT=5000 

@@ -95,15 +95,15 @@ async function checkSchema() {
       console.log(getContactsCreateTableSQL());
     } else {
       console.log('✅ contacts table found with the following schema:\n');
-      
+    
       let contactsHasIssues = false;
-      
+    
       contactsResult.rows.forEach(col => {
-        const { column_name, data_type, is_nullable, column_default } = col;
-        let status = '✅';
-        let issue = '';
-        
-        // Check for specific issues
+      const { column_name, data_type, is_nullable, column_default } = col;
+      let status = '✅';
+      let issue = '';
+      
+      // Check for specific issues
         if (column_name === 'status' && data_type !== 'USER-DEFINED') {
           status = '❌';
           issue = ` (ISSUE: Should be status ENUM, not ${data_type.toUpperCase()})`;
@@ -111,14 +111,14 @@ async function checkSchema() {
         }
         
         if (column_name === 'user_id' && data_type !== 'integer') {
-          status = '❌';
+        status = '❌';
           issue = ` (ISSUE: Should be INTEGER, not ${data_type.toUpperCase()})`;
           contactsHasIssues = true;
-        }
-        
-        console.log(`${status} ${column_name.padEnd(15)} | ${data_type.toUpperCase().padEnd(12)} | ${is_nullable === 'YES' ? 'NULLABLE' : 'NOT NULL'} ${issue}`);
-      });
+      }
       
+      console.log(`${status} ${column_name.padEnd(15)} | ${data_type.toUpperCase().padEnd(12)} | ${is_nullable === 'YES' ? 'NULLABLE' : 'NOT NULL'} ${issue}`);
+    });
+    
       if (contactsHasIssues) {
         console.log('\n🚨 CONTACTS TABLE SCHEMA ISSUES DETECTED!');
         console.log('\nTo fix the issues, you may need to recreate the table:');
