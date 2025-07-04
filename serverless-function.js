@@ -32,7 +32,7 @@ const config = {
   githubRepo: process.env.GITHUB_REPO || 'daveenci-ai/daveenci-ai-crm-business-card-images',
   
   // Processing
-  imageRepoPath: 'cards/',
+  imageRepoPath: '', // Root directory - no subfolder
   defaultUserId: 1 // Will be overridden by database lookup
 };
 
@@ -178,9 +178,19 @@ async function validateGitHubWebhook(event) {
     }
     
     // Find newly added image files
-    const addedFiles = body.commits
-      .flatMap(commit => commit.added || [])
-      .filter(file => file.startsWith(config.imageRepoPath) && /\.(jpg|jpeg|png|gif|webp)$/i.test(file));
+    const allAddedFiles = body.commits.flatMap(commit => commit.added || []);
+    console.log('📁 All added files:', allAddedFiles);
+    
+    const addedFiles = allAddedFiles
+      .filter(file => {
+        // If imageRepoPath is empty, check all files; otherwise check files that start with the path
+        const pathMatch = config.imageRepoPath === '' || file.startsWith(config.imageRepoPath);
+        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file);
+        console.log(`🔍 File: ${file}, Path match: ${pathMatch}, Is image: ${isImage}`);
+        return pathMatch && isImage;
+      });
+    
+    console.log('📸 Image files found:', addedFiles);
     
     if (addedFiles.length === 0) {
       return { valid: false, error: 'No new image files found' };
