@@ -173,14 +173,18 @@ async function validateGitHubWebhook(event) {
     // Now parse the JSON body after signature validation
     let body;
     try {
-      // Check if body is wrapped in payload (form-encoded webhook)
-      const parsedBody = JSON.parse(event.body);
-      if (parsedBody.payload) {
-        console.log('📦 Detected form-encoded webhook payload');
-        body = JSON.parse(parsedBody.payload);
+      // Check if body is URL-encoded form data
+      if (event.body.startsWith('payload=')) {
+        console.log('📦 Detected URL-encoded webhook payload');
+        const urlParams = new URLSearchParams(event.body);
+        const payloadJson = urlParams.get('payload');
+        if (!payloadJson) {
+          throw new Error('No payload found in URL-encoded data');
+        }
+        body = JSON.parse(payloadJson);
       } else {
         console.log('📦 Detected direct JSON webhook payload');
-        body = parsedBody;
+        body = JSON.parse(event.body);
       }
     } catch (error) {
       console.log('❌ Error parsing webhook body:', error.message);
