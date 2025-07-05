@@ -343,7 +343,6 @@ json
 {
   "contact_data": {
     "full_name": "John Doe",
-    "title": "CEO",
     "primary_email": "john.doe@example.com",
     "secondary_email": null,
     "primary_phone": "+1 (234) 567-8900",
@@ -397,10 +396,9 @@ json
     
     // Apply fallback values for any missing or invalid data
     const cleanedData = {
-      name: contactData.full_name || "Unknown",
-      company: contactData.company_name || "Unknown", 
-      title: contactData.title || "Unknown",
-      industry: contactData.industry || "Unknown",
+      name: contactData.full_name || "Unknown Person",
+      company: contactData.company_name || "Unknown Company", 
+      industry: contactData.industry || "Unknown Industry",
       primary_email: contactData.primary_email || "unknown@unknown.com",
       secondary_email: contactData.secondary_email || null,
       primary_phone: contactData.primary_phone || "0000000000",
@@ -535,14 +533,13 @@ async function handleDatabaseOperations(contactData, research) {
       
       const insertResult = await client.query(`
         INSERT INTO contacts (
-          name, company, title, industry, primary_email, secondary_email, primary_phone, secondary_phone,
+          name, company, industry, primary_email, secondary_email, primary_phone, secondary_phone,
           website, address, source, status, user_id, notes, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
         RETURNING id
       `, [
         contactData.name,
         contactData.company,
-        contactData.title,
         contactData.industry,
         contactData.primary_email,
         contactData.secondary_email,
