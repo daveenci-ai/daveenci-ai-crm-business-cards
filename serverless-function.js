@@ -4,10 +4,9 @@
  * This function implements the complete workflow:
  * 1. Receive GitHub webhook
  * 2. Extract image data
- * 3. Use Gemini for data extraction
+ * 3. Use Gemini for data extraction and research insights
  * 4. Validate and store in database
- * 5. Use Gemini for research
- * 6. Send Telegram notification
+ * 5. Send Telegram notification with research insights
  */
 
 const { Pool } = require('pg');
@@ -32,8 +31,7 @@ const config = {
   githubRepo: process.env.GITHUB_REPO || 'daveenci-ai/daveenci-ai-crm-business-card-images',
   
   // Processing
-  imageRepoPath: '', // Root directory - no subfolder
-  defaultUserId: 1 // Will be overridden by database lookup
+  imageRepoPath: '' // Root directory - no subfolder
 };
 
 // Initialize services
@@ -81,11 +79,21 @@ async function handleBusinessCardWebhook(event, context) {
       };
     }
     
-    console.log('✅ STEP 4 COMPLETE: Data extraction successful');
+    console.log('✅ STEP 4 COMPLETE: Data extraction and research successful');
     console.log('👤 Extracted contact:', extractedData.data.name);
     console.log('🏢 Company:', extractedData.data.company);
     console.log('📧 Email:', extractedData.data.primary_email);
     console.log('📱 Phone:', extractedData.data.primary_phone);
+    
+    // Log research insights
+    if (extractedData.research && Object.keys(extractedData.research).length > 0) {
+      console.log('🧠 Research insights extracted:');
+      console.log('- About person:', extractedData.research.about_person ? 'Available' : 'Not available');
+      console.log('- About company:', extractedData.research.about_company ? 'Available' : 'Not available');
+      console.log('- Conversation starter:', extractedData.research.conversation_starter ? 'Available' : 'Not available');
+      console.log('- Opportunities:', extractedData.research.opportunities ? 'Available' : 'Not available');
+      console.log('- Challenges:', extractedData.research.challenges ? 'Available' : 'Not available');
+    }
     
     // Step 3: Validate extracted data
     console.log('🔍 STEP 5: Validating extracted data...');
@@ -100,14 +108,39 @@ async function handleBusinessCardWebhook(event, context) {
     }
     console.log('✅ STEP 5 COMPLETE: Data validation passed');
     
-    // Step 4: Research using Gemini (do this before database operations for new contacts)
-    console.log('🧠 STEP 6: Starting AI research for contact and company...');
-    const research = await performBusinessResearch(extractedData.data);
+    // Step 4: Prepare research data for Telegram notifications
+    console.log('🧠 STEP 6: Processing research insights...');
+    const research = {
+      success: extractedData.research && Object.keys(extractedData.research).length > 0,
+      research: extractedData.research || {}
+    };
+    
     if (research.success) {
-      console.log('✅ STEP 6 COMPLETE: AI research completed successfully');
-      console.log('📄 Research length:', research.research.length, 'characters');
+      console.log('✅ STEP 6 COMPLETE: Research insights processed successfully');
+      
+      // Create a formatted research string for Telegram
+      const researchParts = [];
+      if (research.research.about_person && research.research.about_person !== "Not available") {
+        researchParts.push(research.research.about_person);
+      }
+      if (research.research.about_company && research.research.about_company !== "Not available") {
+        researchParts.push(research.research.about_company);
+      }
+      if (research.research.conversation_starter && research.research.conversation_starter !== "Not available") {
+        researchParts.push(research.research.conversation_starter);
+      }
+      if (research.research.opportunities && research.research.opportunities !== "Not available") {
+        researchParts.push(research.research.opportunities);
+      }
+      if (research.research.challenges && research.research.challenges !== "Not available") {
+        researchParts.push(research.research.challenges);
+      }
+      
+      research.telegramMessage = researchParts.join('\n\n');
+      console.log('📄 Telegram research length:', research.telegramMessage.length, 'characters');
     } else {
-      console.log('⚠️ STEP 6 WARNING: AI research failed -', research.error);
+      console.log('⚠️ STEP 6 WARNING: No research insights available');
+      research.telegramMessage = 'Research could not be completed at this time.';
     }
     
     // Step 5: Database operations (pass research data for new contacts)
@@ -145,7 +178,8 @@ async function handleBusinessCardWebhook(event, context) {
         contact: extractedData.data.name,
         company: extractedData.data.company,
         isNewContact: dbResult.isNewContact,
-        researchCompleted: research.success
+        researchCompleted: research.success,
+        researchInsights: research.success ? Object.keys(research.research).length : 0
       })
     };
     
@@ -289,37 +323,50 @@ async function fetchImageFromGitHub(imagePath) {
  */
 async function extractBusinessCardData(imageData) {
   try {
-    const prompt = `You are an expert data extraction assistant. Analyze the following business card image and extract the contact information. Provide the output ONLY as a valid JSON object. Do not include any text before or after the JSON.
+    const prompt = `You are an expert OCR and research assistant specifically trained to extract information from business cards and provide concise, actionable insights.
 
-The JSON object must have these exact keys: name, company, title, primary_email, secondary_email, primary_phone, secondary_phone, website, address.
+**Instruction:**
+1.  **Output Format:** Your *entire* response must be a single, valid JSON object. Do not include any preambles, explanations, or text outside the JSON structure.
+2.  **Contact Data Extraction:**
+    *   Extract the requested contact information from the provided business card image.
+    *   If a specific piece of information is *not present* on the card, set its value to null. Do not omit the key.
+    *   Adhere strictly to the specified format for each field's value.
+3.  **Concise Research Insights:**
+    *   Based on the extracted 'full_name' and 'company_name', perform a quick, high-level online search (leverage your internal knowledge and web access capabilities if available) to provide extremely concise, scannable insights.
+    *   Each research insight (about_person, about_company, conversation_starter, opportunities, challenges) should be a maximum of **1-3 sentences**.
+    *   If information for a specific insight is not readily available or cannot be confidently determined, set its value to "Not available" (as a string).
 
-Follow these rules:
-- If a field is not found or unclear, use these exact fallback values:
-  * name: "Unknown Person" (if no name found)
-  * company: "Unknown Company" (if no company found)
-  * title: "Unknown Title" (if no title found)
-  * primary_email: "unknown@unknown.com" (if no email found)
-  * secondary_email: null (only if you find a second valid email)
-  * primary_phone: "0000000000" (if no phone found)
-  * secondary_phone: null (only if you find a second valid phone)
-  * website: "https://unknown.com" (if no website found)
-  * address: "Unknown Address" (if no address found)
+---
+Desired JSON Structure Example:
 
-- If you find multiple emails or phones, identify the most likely personal email (e.g., @gmail.com, @yahoo.com) and assign it to primary_email. The corporate email should be secondary_email. If only one is found, use primary_email and set secondary_email to null.
-- Clean the data: format phone numbers as digits only (e.g., 5551234567) and ensure websites include 'https://'.
-- NEVER leave any field empty or with invalid data - always use the fallback values above.
-
-Here is the JSON structure to follow:
+json
 {
-  "name": "...",
-  "company": "...",
-  "title": "...",
-  "primary_email": "...",
-  "secondary_email": null,
-  "primary_phone": "...",
-  "secondary_phone": null,
-  "website": "...",
-  "address": "..."
+  "contact_data": {
+    "full_name": "John Doe",
+    "title": "CEO",
+    "primary_email": "john.doe@example.com",
+    "secondary_email": null,
+    "primary_phone": "+1 (234) 567-8900",
+    "secondary_phone": null,
+    "company_name": "Acme Corp.",
+    "industry": "Manufacturing",
+    "full_address": "123 Main St, Anytown, TX USA",
+    "website_url": "acmecorp.com",
+    "linkedin_url": "linkedin.com/in/johndoe",
+    "twitter_url": null,
+    "facebook_url": null,
+    "instagram_url": null,
+    "youtube_url": null,
+    "tiktok_url": null,
+    "pinterest_url": null
+  },
+  "research_insights": {
+    "about_person": "👤 John Doe is the CEO of Acme Corp, known for his work in sustainable manufacturing and supply chain optimization. He recently spoke at the Global Tech Summit on AI in logistics.",
+    "about_company": "🏢 Acme Corp is a leading innovator in sustainable manufacturing solutions, specializing in eco-friendly materials and energy-efficient production processes. They recently secured a significant Series B funding round.",
+    "conversation_starter": "💬 I noticed Acme Corp recently secured Series B funding. What exciting new projects or initiatives are you focusing on with this growth? I also saw you spoke at the Global Tech Summit; how do you see AI transforming supply chains?",
+    "opportunities": "💡 Potential for collaboration on sustainable supply chain technology. Your expertise in renewable energy solutions might align with Acme Corp's green initiatives. Could explore partnership in smart factory automation.",
+    "challenges": "🚨 The manufacturing industry faces increasing pressure for ESG compliance and raw material price volatility. Acme Corp might be challenged by scaling production while maintaining sustainability standards or navigating global trade complexities."
+  }
 }`;
 
     const imagePart = {
@@ -341,17 +388,33 @@ Here is the JSON structure to follow:
     
     const extractedData = JSON.parse(jsonMatch[0]);
     
+    // Ensure we have the expected structure
+    if (!extractedData.contact_data) {
+      return { success: false, error: 'Missing contact_data in response' };
+    }
+    
+    const contactData = extractedData.contact_data;
+    
     // Apply fallback values for any missing or invalid data
     const cleanedData = {
-      name: extractedData.name || "Unknown Person",
-      company: extractedData.company || "Unknown Company", 
-      title: extractedData.title || "Unknown Title",
-      primary_email: extractedData.primary_email || "unknown@unknown.com",
-      secondary_email: extractedData.secondary_email || null,
-      primary_phone: extractedData.primary_phone || "0000000000",
-      secondary_phone: extractedData.secondary_phone || null,
-      website: extractedData.website || "https://unknown.com",
-      address: extractedData.address || "Unknown Address"
+      name: contactData.full_name || "Unknown",
+      company: contactData.company_name || "Unknown", 
+      title: contactData.title || "Unknown",
+      industry: contactData.industry || "Unknown",
+      primary_email: contactData.primary_email || "unknown@unknown.com",
+      secondary_email: contactData.secondary_email || null,
+      primary_phone: contactData.primary_phone || "0000000000",
+      secondary_phone: contactData.secondary_phone || null,
+      website: contactData.website_url || "unknown.com",
+      address: contactData.full_address || "Unknown",
+      // Add social media fields
+      linkedin_url: contactData.linkedin_url || null,
+      twitter_url: contactData.twitter_url || null,
+      facebook_url: contactData.facebook_url || null,
+      instagram_url: contactData.instagram_url || null,
+      youtube_url: contactData.youtube_url || null,
+      tiktok_url: contactData.tiktok_url || null,
+      pinterest_url: contactData.pinterest_url || null
     };
     
     // Validate and clean email fields
@@ -384,9 +447,13 @@ Here is the JSON structure to follow:
     
     console.log('🧹 Data cleaning: Applied fallback values and validation');
     
+    // Extract research insights
+    const researchInsights = extractedData.research_insights || {};
+    
     return {
       success: true,
-      data: cleanedData
+      data: cleanedData,
+      research: researchInsights
     };
     
   } catch (error) {
@@ -463,18 +530,20 @@ async function handleDatabaseOperations(contactData, research) {
     );
     
     if (existingContact.rows.length === 0) {
-      // Insert new contact with research data in notes
-      const notesWithResearch = research.success ? research.research : 'Research could not be completed at this time.';
+      // Insert new contact (no research in database - research goes to Telegram only)
+      const defaultNotes = `Contact added via business card scan on ${new Date().toLocaleDateString()}`;
       
       const insertResult = await client.query(`
         INSERT INTO contacts (
-          name, company, primary_email, secondary_email, primary_phone, secondary_phone,
+          name, company, title, industry, primary_email, secondary_email, primary_phone, secondary_phone,
           website, address, source, status, user_id, notes, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
         RETURNING id
       `, [
         contactData.name,
         contactData.company,
+        contactData.title,
+        contactData.industry,
         contactData.primary_email,
         contactData.secondary_email,
         contactData.primary_phone,
@@ -484,10 +553,10 @@ async function handleDatabaseOperations(contactData, research) {
         'Business Card Scan',
         'PROSPECTS',
         userId,
-        notesWithResearch
+        defaultNotes
       ]);
       
-      console.log('✅ New contact created with research data in notes');
+      console.log('✅ New contact created (research will be sent to Telegram)');
       
       return {
         success: true,
@@ -527,54 +596,7 @@ async function handleDatabaseOperations(contactData, research) {
 
 
 
-/**
- * Perform business research using Gemini
- */
-async function performBusinessResearch(contactData) {
-  try {
-    console.log('🔬 Research: Preparing AI prompt for', contactData.name, 'at', contactData.company);
-    
-    const prompt = `You are a professional business research analyst. I just met a person and need a concise briefing to help me establish a strong connection.
 
-Person: ${contactData.name}
-Company: ${contactData.company}
-Title: ${contactData.title || 'Not specified'}
-
-Provide a brief report formatted in Markdown with the following sections:
-
-1. 👤 About ${contactData.name}: Briefly summarize their professional role and background based on public information (e.g., LinkedIn).
-
-2. 🏢 About ${contactData.company}: What does the company do? Who are its main competitors?
-
-3. 📈 Opportunities & Challenges: What are 1-2 key strategic challenges the company is likely facing? What are 1-2 recent opportunities or successes they've had?
-
-4. 💬 Conversation Starters / Icebreakers: Based on recent news, company press releases, or the person's public activity, provide 2-3 specific talking points. Example: 'I saw your company just launched a new AI-powered analytics tool. I'm curious to hear how the market is responding to it.'
-
-Keep the entire report concise and easy to read on a mobile phone.`;
-
-    console.log('🤖 Research: Sending request to Gemini AI...');
-    const result = await geminiModel.generateContent(prompt);
-    const response = await result.response;
-    const research = response.text();
-    
-    console.log('✅ Research: Gemini AI response received');
-    console.log('📝 Research: Generated', research.length, 'characters of research data');
-    console.log('🔍 Research preview:', research.substring(0, 150) + '...');
-    
-    return {
-      success: true,
-      research: research
-    };
-    
-  } catch (error) {
-    console.log('❌ Research: Gemini AI request failed -', error.message);
-    return {
-      success: false,
-      error: error.message,
-      research: 'Research could not be completed at this time.'
-    };
-  }
-}
 
 /**
  * Send Telegram notification
@@ -589,6 +611,7 @@ async function sendTelegramNotification(contactData, research, dbResult) {
     
     let message = `${status}: *${contactData.name}*\n`;
     message += `🏢 Company: ${contactData.company || 'Not specified'}\n`;
+    message += `🏭 Industry: ${contactData.industry || 'Not specified'}\n`;
     message += `📧 Email: ${contactData.primary_email}\n`;
     if (contactData.primary_phone) {
       message += `📞 Phone: ${contactData.primary_phone}\n`;
@@ -596,11 +619,11 @@ async function sendTelegramNotification(contactData, research, dbResult) {
     message += `\n`;
     
     if (research.success) {
-      message += research.research;
-      console.log('📱 Telegram: Including research data in message');
+      message += research.telegramMessage;
+      console.log('📱 Telegram: Including research insights in message');
     } else {
-      message += `⚠️ Research could not be completed: ${research.error}`;
-      console.log('📱 Telegram: Research failed, including error message');
+      message += `⚠️ Research could not be completed at this time.`;
+      console.log('📱 Telegram: Research failed, including fallback message');
     }
     
     console.log('📱 Telegram: Message length:', message.length, 'characters');
@@ -650,6 +673,5 @@ module.exports = {
   handleBusinessCardWebhook,
   // For testing
   extractBusinessCardData,
-  validateExtractedData,
-  performBusinessResearch
+  validateExtractedData
 }; 

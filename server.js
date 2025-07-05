@@ -65,7 +65,7 @@ app.post('/api/webhook', async (req, res) => {
   } catch (error) {
     console.error('❌ Webhook handler error:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
-  }
+}
 });
 
 // Health check endpoint
@@ -88,7 +88,7 @@ function authenticateToken(req, res, next) {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' });
-    }
+  }
     req.user = user;
     next();
   });
