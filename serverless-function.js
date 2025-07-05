@@ -324,21 +324,27 @@ async function fetchImageFromGitHub(imagePath) {
 async function extractBusinessCardData(imageData) {
   try {
     const prompt = `You are an expert OCR and research assistant specifically trained to extract information from business cards and provide concise, actionable insights.
+Instructions:
+1. Output Format: 
+   - Your entire response must be a single, valid JSON object. Do not include any preambles, explanations, or text outside the JSON structure.
+2. Contact Data Extraction:
+   - Extract all requested contact information from the provided business card image.
+   - If any specific information is not present, set its value to null. Do not omit any key.
+   - Pay special attention to:
+     - Website URLs directly listed on the card.
+     - Email domains to infer company websites if no URL is explicitly stated.
+     - QR codes, which may contain embedded URLs, vCards, or additional contact data—process and extract if available.
 
-**Instruction:**
-1.  **Output Format:** Your *entire* response must be a single, valid JSON object. Do not include any preambles, explanations, or text outside the JSON structure.
-2.  **Contact Data Extraction:**
-    *   Extract the requested contact information from the provided business card image.
-    *   If a specific piece of information is *not present* on the card, set its value to null. Do not omit the key.
-    *   Adhere strictly to the specified format for each field's value.
-3.  **Concise Research Insights:**
-    *   Based on the extracted 'full_name' and 'company_name', perform a quick, high-level online search (leverage your internal knowledge and web access capabilities if available) to provide extremely concise, scannable insights.
-    *   Each research insight (about_person, about_company, conversation_starter, opportunities, challenges) should be a maximum of **1-3 sentences**.
-    *   If information for a specific insight is not readily available or cannot be confidently determined, set its value to "Not available" (as a string).
+     - Adhere strictly to the specified format for each field’s value.
+3. Concise Research Insights:
+   - Based on the extracted full_name and company_name, and any discovered website_url (either directly from the card or inferred), perform a high-level contextual search using available internal knowledge or web-access tools. Provide a concise snapshot in the following fields:
+     - about_person: 1–3 sentence summary of the person’s role, background, or professional identity.
+     - about_company: 1–3 sentence overview of the company, including industry and focus.
+     - conversation_starter: A relatable fact, news item, or interesting point that could be used to initiate a meaningful conversation with the person.
+     - opportunities: 1–3 sentence note on how this person or company could align with potential business, partnerships, or collaborations.
+     - challenges: Mention any potential red flags, risks, or industry headwinds relevant to this person or company.
 
----
 Desired JSON Structure Example:
-
 json
 {
   "contact_data": {
