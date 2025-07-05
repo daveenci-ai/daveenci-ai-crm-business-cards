@@ -155,14 +155,10 @@ async function handleBusinessCardWebhook(event, context) {
     console.log(`📊 Contact status: ${dbResult.isNewContact ? 'NEW CONTACT CREATED' : 'EXISTING CONTACT - TOUCHPOINT ADDED'}`);
     console.log(`🆔 Contact ID: ${dbResult.contactId}`);
     
-    // Step 6: Send Telegram notification (only for new contacts)
-    if (dbResult.isNewContact) {
-      console.log('📱 STEP 8: Sending Telegram notification for new contact...');
-      await sendTelegramNotification(extractedData.data, research, dbResult);
-      console.log('✅ STEP 8 COMPLETE: Telegram notification sent successfully');
-    } else {
-      console.log('⏭️ STEP 8 SKIPPED: No Telegram notification for existing contact (touchpoint only)');
-    }
+    // Step 6: Send Telegram notification (for all contacts)
+    console.log('📱 STEP 8: Sending Telegram notification...');
+    await sendTelegramNotification(extractedData.data, research, dbResult);
+    console.log('✅ STEP 8 COMPLETE: Telegram notification sent successfully');
     
     console.log('🎉 PIPELINE COMPLETE: All steps finished successfully');
     console.log('⏰ Completion time:', new Date().toISOString());
