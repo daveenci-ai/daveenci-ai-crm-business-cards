@@ -89,7 +89,6 @@ async function handleBusinessCardWebhook(event, context) {
     if (extractedData.research && Object.keys(extractedData.research).length > 0) {
       console.log('🧠 Research insights extracted:');
       console.log('- About person:', extractedData.research.about_person ? 'Available' : 'Not available');
-      console.log('- About company:', extractedData.research.about_company ? 'Available' : 'Not available');
       console.log('- Conversation starter:', extractedData.research.conversation_starter ? 'Available' : 'Not available');
       console.log('- Opportunities:', extractedData.research.opportunities ? 'Available' : 'Not available');
       console.log('- Challenges:', extractedData.research.challenges ? 'Available' : 'Not available');
@@ -122,9 +121,6 @@ async function handleBusinessCardWebhook(event, context) {
       const researchParts = [];
       if (research.research.about_person && research.research.about_person !== "Not available") {
         researchParts.push(research.research.about_person);
-      }
-      if (research.research.about_company && research.research.about_company !== "Not available") {
-        researchParts.push(research.research.about_company);
       }
       if (research.research.conversation_starter && research.research.conversation_starter !== "Not available") {
         researchParts.push(research.research.conversation_starter);
@@ -339,7 +335,6 @@ Instructions:
 3. Concise Research Insights:
    - Based on the extracted full_name and company_name, and any discovered website_url (either directly from the card or inferred), perform a high-level contextual search using available internal knowledge or web-access tools. Provide a concise snapshot in the following fields:
      - about_person: 1–3 sentence summary of the person’s role, background, or professional identity.
-     - about_company: 1–3 sentence overview of the company, including industry and focus.
      - conversation_starter: A relatable fact, news item, or interesting point that could be used to initiate a meaningful conversation with the person.
      - opportunities: 1–3 sentence note on how this person or company could align with potential business, partnerships, or collaborations.
      - challenges: Mention any potential red flags, risks, or industry headwinds relevant to this person or company.
@@ -367,7 +362,6 @@ json
   },
   "research_insights": {
     "about_person": "👤 John Doe is the CEO of Acme Corp, known for his work in sustainable manufacturing and supply chain optimization. He recently spoke at the Global Tech Summit on AI in logistics.",
-    "about_company": "🏢 Acme Corp is a leading innovator in sustainable manufacturing solutions, specializing in eco-friendly materials and energy-efficient production processes. They recently secured a significant Series B funding round.",
     "conversation_starter": "💬 I noticed Acme Corp recently secured Series B funding. What exciting new projects or initiatives are you focusing on with this growth? I also saw you spoke at the Global Tech Summit; how do you see AI transforming supply chains?",
     "opportunities": "💡 Potential for collaboration on sustainable supply chain technology. Your expertise in renewable energy solutions might align with Acme Corp's green initiatives. Could explore partnership in smart factory automation.",
     "challenges": "🚨 The manufacturing industry faces increasing pressure for ESG compliance and raw material price volatility. Acme Corp might be challenged by scaling production while maintaining sustainability standards or navigating global trade complexities."
@@ -610,14 +604,13 @@ async function sendTelegramNotification(contactData, research, dbResult) {
     console.log('📱 Telegram: Bot token configured:', !!config.telegramBotToken);
     console.log('📱 Telegram: Chat ID configured:', !!config.telegramChatId);
     
-    const status = dbResult.isNewContact ? '✅ New contact added' : '🔄 Touchpoint added for existing contact';
+    const status = dbResult.isNewContact ? '✅' : '🔄';
     
-    let message = `${status}: *${contactData.name}*\n`;
-    message += `🏢 Company: ${contactData.company || 'Not specified'}\n`;
-    message += `🏭 Industry: ${contactData.industry || 'Not specified'}\n`;
-    message += `📧 Email: ${contactData.primary_email}\n`;
+    let message = `${status} ${contactData.name}\n`;
+    message += `🏢 ${contactData.company || 'Not specified'}\n`;
+    message += `📧 ${contactData.primary_email}\n`;
     if (contactData.primary_phone) {
-      message += `📞 Phone: ${contactData.primary_phone}\n`;
+      message += `📞 ${contactData.primary_phone}\n`;
     }
     message += `\n`;
     
