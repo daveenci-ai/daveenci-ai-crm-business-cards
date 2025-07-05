@@ -41,7 +41,7 @@ const pool = new Pool({
 });
 
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
-const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 /**
  * Main handler function for serverless execution
