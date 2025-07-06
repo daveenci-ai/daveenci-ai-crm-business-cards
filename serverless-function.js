@@ -122,9 +122,9 @@ async function handleBusinessCardWebhook(event, context) {
         researchParts.push(research.research.about_person);
       }
       if (research.research.opportunities && research.research.opportunities !== "Not available") {
-        // Format opportunities as separate lines for Telegram
+        // Format opportunities as separate lines for Telegram with extra spacing
         if (Array.isArray(research.research.opportunities)) {
-          const opportunitiesText = research.research.opportunities.join('\n');
+          const opportunitiesText = research.research.opportunities.join('\n\n');
           researchParts.push(opportunitiesText);
         } else {
           researchParts.push(research.research.opportunities);
@@ -551,7 +551,7 @@ async function handleDatabaseOperations(contactData, research) {
     if (research.research && research.research.opportunities && research.research.opportunities !== "Not available") {
       if (Array.isArray(research.research.opportunities)) {
         // If it's an array, join with line breaks to show all 3 opportunities
-        opportunitiesNote = research.research.opportunities.join('\n');
+        opportunitiesNote = research.research.opportunities.join('\n\n');
       } else if (typeof research.research.opportunities === 'string') {
         // If it's a string, use as-is
         opportunitiesNote = research.research.opportunities;
