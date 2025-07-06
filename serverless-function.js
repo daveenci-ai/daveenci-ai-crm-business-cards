@@ -315,28 +315,26 @@ async function fetchImageFromGitHub(imagePath) {
  */
 async function extractBusinessCardData(imageData) {
   try {
-    const prompt = `You are an expert OCR and research assistant trained to extract data from business cards and deliver concise, actionable insights to foster meaningful business conversations. 
+    const prompt = `You are an expert OCR and research assistant trained to extract data from business cards and deliver concise, actionable insights to support AI, automation, and digital marketing outreach.
+
 Instructions:
 1. Output Format:
-   - Return a single valid JSON object with no explanation, headers, or extra text.
+   - Return a single valid JSON object with no extra explanation or text.
 
 2. Contact Data Extraction:
-   - Extract all available contact details from the card image or embedded QR codes.
-   - If a field is missing, return null as the value.
-   - For email domains, infer website URLs if not explicitly listed.
-   - Include all social media URLs if found (LinkedIn, Twitter, etc.).
+   - Extract all possible contact info from the image or embedded QR code. If any field is missing, return it as null.
+   - Infer website URLs from email domains if no URL is listed.
+   - Include all found social links.
 
-3. Research Insights (keep it tight and useful):
-   - Use extracted full_name, company_name, and website_url (direct or inferred) for quick contextual lookup using internal knowledge or search tools.
-   - Make each field punchy—designed for a quick skim before a real-world interaction.
+3. Research Insights (brief and strategic):
+   - Use full_name, company_name, and website_url (direct or inferred) to quickly generate relevant background using internal knowledge or search tools.
 
-4. Field Descriptions:
-   - about_person: 1–2 sentences summarizing role, background, or unique value.
-   - conversation_starters: 2–3 brief bullets with relevant, relatable, or timely points to build rapport.
-   - opportunities: 1–2 bullets highlighting potential business synergy or ways to connect.
-   - challenges: 1 bullet flagging a business or industry hurdle they may face.
+4. Field Guidelines:
+   - about_person: 1–2 lines about their role, expertise, or identity.
+   - conversation_starters: 2–3 *strategic* bullets—each one a **bridge** to your services in AI, automation, or digital marketing. Should hint at how you can help, or align with a problem they might face.
+   - opportunities: 1–2 bullets on ways to collaborate, help them grow, or improve efficiency.
 
-5. Output JSON Structure:
+5. Output JSON Example:
 json
 {
   "contact_data": {
@@ -359,17 +357,15 @@ json
   },
   "research_insights": {
     "about_person": "👤 CEO of Acme Corp, focused on AI-driven manufacturing and sustainable logistics.",
-    "conversation_starters": [
-      "Acme's recent push into green supply chains",
-      "Impact of AI on factory automation",
-      "New ESG regulations affecting manufacturing"
+     "conversation_starters": [
+      "🚨 Noticed Bright Labs works with healthcare—have you explored automation for lead qualification or patient funnels?",
+      "🚨 With Google’s changing ad policies, how are you adjusting your digital targeting strategies?",
+      "🚨 We’ve helped similar agencies integrate AI to scale personalization without extra headcount—curious if that's a current focus for you?"
     ],
     "opportunities": [
-      "Strong fit for sustainable tech partnerships",
-      "Could align on smart logistics or IoT solutions"
-    ],
-    "challenges": "🚨 Facing global trade volatility and ESG compliance hurdles."
-  }
+      "Strong fit for AI-driven campaign optimization or funnel automation.",
+      "Possible co-creation of client tools or white-label AI marketing solutions."
+    ]
 }`;
 
     const imagePart = {
