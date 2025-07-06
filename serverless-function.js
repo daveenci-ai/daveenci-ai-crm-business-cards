@@ -315,27 +315,28 @@ async function fetchImageFromGitHub(imagePath) {
  */
 async function extractBusinessCardData(imageData) {
   try {
-    const prompt = `You are an expert OCR and research assistant specifically trained to extract information from business cards and provide concise, actionable insights.
+    const prompt = `You are an expert OCR and research assistant trained to extract data from business cards and deliver concise, actionable insights to foster meaningful business conversations. 
 Instructions:
-1. Output Format: 
-   - Your entire response must be a single, valid JSON object. Do not include any preambles, explanations, or text outside the JSON structure.
+1. Output Format:
+   - Return a single valid JSON object with no explanation, headers, or extra text.
+
 2. Contact Data Extraction:
-   - Extract all requested contact information from the provided business card image.
-   - If any specific information is not present, set its value to null. Do not omit any key.
-   - Pay special attention to:
-     - Website URLs directly listed on the card.
-     - Email domains to infer company websites if no URL is explicitly stated.
-     - QR codes, which may contain embedded URLs, vCards, or additional contact data—process and extract if available.
+   - Extract all available contact details from the card image or embedded QR codes.
+   - If a field is missing, return `null` as the value.
+   - For email domains, infer website URLs if not explicitly listed.
+   - Include all social media URLs if found (LinkedIn, Twitter, etc.).
 
-     - Adhere strictly to the specified format for each field’s value.
-3. Concise Research Insights:
-   - Based on the extracted full_name and company_name, and any discovered website_url (either directly from the card or inferred), perform a high-level contextual search using available internal knowledge or web-access tools. Provide a concise snapshot in the following fields:
-     - about_person: 1–3 sentence summary of the person’s role, background, or professional identity.
-     - conversation_starter: A relatable fact, news item, or interesting point that could be used to initiate a meaningful conversation with the person.
-     - opportunities: 1–3 sentence note on how this person or company could align with potential business, partnerships, or collaborations.
-     - challenges: Mention any potential red flags, risks, or industry headwinds relevant to this person or company.
+3. Research Insights (keep it tight and useful):
+   - Use extracted full_name, company_name, and website_url (direct or inferred) for quick contextual lookup using internal knowledge or search tools.
+   - Make each field punchy—designed for a quick skim before a real-world interaction.
 
-Desired JSON Structure Example:
+4. Field Descriptions:
+   - about_person: 1–2 sentences summarizing role, background, or unique value.
+   - conversation_starters: 2–3 brief bullets with relevant, relatable, or timely points to build rapport.
+   - opportunities: 1–2 bullets highlighting potential business synergy or ways to connect.
+   - challenges: 1 bullet flagging a business or industry hurdle they may face.
+
+5. Output JSON Structure:
 json
 {
   "contact_data": {
@@ -357,10 +358,17 @@ json
     "pinterest_url": null
   },
   "research_insights": {
-    "about_person": "👤 John Doe is the CEO of Acme Corp, known for his work in sustainable manufacturing and supply chain optimization. He recently spoke at the Global Tech Summit on AI in logistics.",
-    "conversation_starter": "💬 I noticed Acme Corp recently secured Series B funding. What exciting new projects or initiatives are you focusing on with this growth? I also saw you spoke at the Global Tech Summit; how do you see AI transforming supply chains?",
-    "opportunities": "💡 Potential for collaboration on sustainable supply chain technology. Your expertise in renewable energy solutions might align with Acme Corp's green initiatives. Could explore partnership in smart factory automation.",
-    "challenges": "🚨 The manufacturing industry faces increasing pressure for ESG compliance and raw material price volatility. Acme Corp might be challenged by scaling production while maintaining sustainability standards or navigating global trade complexities."
+    "about_person": "👤 CEO of Acme Corp, focused on AI-driven manufacturing and sustainable logistics.",
+    "conversation_starters": [
+      "Acme's recent push into green supply chains",
+      "Impact of AI on factory automation",
+      "New ESG regulations affecting manufacturing"
+    ],
+    "opportunities": [
+      "Strong fit for sustainable tech partnerships",
+      "Could align on smart logistics or IoT solutions"
+    ],
+    "challenges": "🚨 Facing global trade volatility and ESG compliance hurdles."
   }
 }`;
 
