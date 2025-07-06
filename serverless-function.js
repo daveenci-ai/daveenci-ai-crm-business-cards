@@ -359,13 +359,14 @@ json
     "about_person": "👤 CEO of Acme Corp, focused on AI-driven manufacturing and sustainable logistics.",
      "conversation_starters": [
       "🚨 Noticed Bright Labs works with healthcare—have you explored automation for lead qualification or patient funnels?",
-      "🚨 With Google’s changing ad policies, how are you adjusting your digital targeting strategies?",
-      "🚨 We’ve helped similar agencies integrate AI to scale personalization without extra headcount—curious if that's a current focus for you?"
+      "🚨 With Google's changing ad policies, how are you adjusting your digital targeting strategies?",
+      "🚨 We've helped similar agencies integrate AI to scale personalization without extra headcount—curious if that's a current focus for you?"
     ],
     "opportunities": [
       "Strong fit for AI-driven campaign optimization or funnel automation.",
       "Possible co-creation of client tools or white-label AI marketing solutions."
     ]
+  }
 }`;
 
     const imagePart = {
