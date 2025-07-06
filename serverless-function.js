@@ -322,7 +322,7 @@ Instructions:
 
 2. Contact Data Extraction:
    - Extract all available contact details from the card image or embedded QR codes.
-   - If a field is missing, return `null` as the value.
+   - If a field is missing, return null as the value.
    - For email domains, infer website URLs if not explicitly listed.
    - Include all social media URLs if found (LinkedIn, Twitter, etc.).
 
