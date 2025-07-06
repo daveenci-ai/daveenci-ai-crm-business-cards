@@ -496,6 +496,25 @@ function validateExtractedData(data) {
     }
   }
   
+  // Website cleaning - remove https://, http://, and www. prefixes
+  if (data.website && data.website.trim().length > 0) {
+    let cleanWebsite = data.website.trim();
+    
+    // Remove protocol prefixes
+    cleanWebsite = cleanWebsite.replace(/^https?:\/\//, '');
+    
+    // Remove www. prefix
+    cleanWebsite = cleanWebsite.replace(/^www\./, '');
+    
+    // Remove trailing slash
+    cleanWebsite = cleanWebsite.replace(/\/$/, '');
+    
+    // Update the data object with cleaned website
+    data.website = cleanWebsite;
+    
+    console.log('🌐 Website cleaned:', data.website);
+  }
+  
   return {
     valid: errors.length === 0,
     errors
@@ -528,8 +547,10 @@ async function handleDatabaseOperations(contactData, research) {
     );
     
     if (existingContact.rows.length === 0) {
-      // Insert new contact (no research in database - research goes to Telegram only)
-      const defaultNotes = `Contact added via business card scan on ${new Date().toLocaleDateString()}`;
+      // Insert new contact - use opportunities from research as notes
+      const opportunitiesNote = research.research && research.research.opportunities && research.research.opportunities !== "Not available" 
+        ? research.research.opportunities 
+        : `Contact added via business card scan on ${new Date().toLocaleDateString()}`;
       
       const insertResult = await client.query(`
         INSERT INTO contacts (
@@ -550,10 +571,10 @@ async function handleDatabaseOperations(contactData, research) {
         'Business Card Scan',
         'PROSPECTS',
         userId,
-        defaultNotes
+        opportunitiesNote
       ]);
       
-      console.log('✅ New contact created (research will be sent to Telegram)');
+      console.log('✅ New contact created with opportunities note from research');
       
       return {
         success: true,
@@ -562,8 +583,12 @@ async function handleDatabaseOperations(contactData, research) {
       };
       
     } else {
-      // Contact already exists - add touchpoint with IN_PERSON source
+      // Contact already exists - add touchpoint with opportunities from research
       const contactId = existingContact.rows[0].id;
+      
+      const opportunitiesNote = research.research && research.research.opportunities && research.research.opportunities !== "Not available" 
+        ? research.research.opportunities 
+        : `Business card scanned on ${new Date().toLocaleDateString()}`;
       
       await client.query(`
         INSERT INTO touchpoints (
@@ -571,11 +596,11 @@ async function handleDatabaseOperations(contactData, research) {
         ) VALUES ($1, $2, $3, NOW())
       `, [
         contactId,
-        `Business card scanned on ${new Date().toLocaleDateString()}`,
+        opportunitiesNote,
         'IN_PERSON'
       ]);
       
-      console.log('✅ Touchpoint added for existing contact');
+      console.log('✅ Touchpoint added for existing contact with opportunities note');
       
       return {
         success: true,
