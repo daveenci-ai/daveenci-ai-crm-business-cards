@@ -240,7 +240,6 @@ Research data is stored in the existing `notes` field to avoid schema changes:
 {
   "ai_research": {
     "summary": "Research summary...",
-    "conversation_starters": ["Starter 1", "Starter 2"],
     "company_info": "Company details...",
     "timestamp": "2024-01-01T00:00:00Z"
   }

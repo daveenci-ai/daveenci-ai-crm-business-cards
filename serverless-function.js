@@ -89,7 +89,6 @@ async function handleBusinessCardWebhook(event, context) {
     if (extractedData.research && Object.keys(extractedData.research).length > 0) {
       console.log('🧠 Research insights extracted:');
       console.log('- About person:', extractedData.research.about_person ? 'Available' : 'Not available');
-      console.log('- Conversation starter:', extractedData.research.conversation_starter ? 'Available' : 'Not available');
       console.log('- Opportunities:', extractedData.research.opportunities ? 'Available' : 'Not available');
       console.log('- Challenges:', extractedData.research.challenges ? 'Available' : 'Not available');
     }
@@ -121,9 +120,6 @@ async function handleBusinessCardWebhook(event, context) {
       const researchParts = [];
       if (research.research.about_person && research.research.about_person !== "Not available") {
         researchParts.push(research.research.about_person);
-      }
-      if (research.research.conversation_starter && research.research.conversation_starter !== "Not available") {
-        researchParts.push(research.research.conversation_starter);
       }
       if (research.research.opportunities && research.research.opportunities !== "Not available") {
         // Format opportunities as separate lines for Telegram
@@ -338,7 +334,6 @@ Instructions:
 4. Field Guidelines:
    - about_person: 1-2 lines about their role, expertise, or identity.
    - opportunities: 3 bullets on ways to collaborate, help them grow, or improve efficiency.
-   - conversation_starters: 3 *strategic* bullets—each one a **bridge** to your services in AI, automation, or digital marketing. Should hint at how you can help, or align with a problem they might face.
 
 
 5. Output JSON Example:
@@ -368,11 +363,6 @@ json
       "🚨 Direct AI-driven optimization of marketing campaigns and sales funnels.",
       "🚨 Co-creation of scalable white-label AI marketing platforms and tools.",
       "🚨 Development of bespoke AI solutions and tools tailored to individual client needs."
-    ],
-    "conversation_starters": [
-      "💭 Are you currently exploring how AI could significantly enhance the performance and ROI of your marketing campaigns or sales funnels?",
-      "💭 How are you currently looking to leverage AI to grow your product line or service offerings in a scalable way for your market?",
-      "💭 What's a critical, unique bottleneck in your business operations where you suspect a custom-tailored AI solution could make a significant impact?"
     ]
   }
 }`;
