@@ -126,7 +126,13 @@ async function handleBusinessCardWebhook(event, context) {
         researchParts.push(research.research.conversation_starter);
       }
       if (research.research.opportunities && research.research.opportunities !== "Not available") {
-        researchParts.push(research.research.opportunities);
+        // Format opportunities as separate lines for Telegram
+        if (Array.isArray(research.research.opportunities)) {
+          const opportunitiesText = research.research.opportunities.join('\n');
+          researchParts.push(opportunitiesText);
+        } else {
+          researchParts.push(research.research.opportunities);
+        }
       }
       if (research.research.challenges && research.research.challenges !== "Not available") {
         researchParts.push(research.research.challenges);
@@ -330,9 +336,10 @@ Instructions:
    - Use full_name, company_name, and website_url (direct or inferred) to quickly generate relevant background using internal knowledge or search tools.
 
 4. Field Guidelines:
-   - about_person: 1–2 lines about their role, expertise, or identity.
-   - conversation_starters: 2–3 *strategic* bullets—each one a **bridge** to your services in AI, automation, or digital marketing. Should hint at how you can help, or align with a problem they might face.
-   - opportunities: 1–2 bullets on ways to collaborate, help them grow, or improve efficiency.
+   - about_person: 1-2 lines about their role, expertise, or identity.
+   - opportunities: 3 bullets on ways to collaborate, help them grow, or improve efficiency.
+   - conversation_starters: 3 *strategic* bullets—each one a **bridge** to your services in AI, automation, or digital marketing. Should hint at how you can help, or align with a problem they might face.
+
 
 5. Output JSON Example:
 json
@@ -357,14 +364,15 @@ json
   },
   "research_insights": {
     "about_person": "👤 CEO of Acme Corp, focused on AI-driven manufacturing and sustainable logistics.",
-     "conversation_starters": [
-      "🚨 Noticed Bright Labs works with healthcare—have you explored automation for lead qualification or patient funnels?",
-      "🚨 With Google's changing ad policies, how are you adjusting your digital targeting strategies?",
-      "🚨 We've helped similar agencies integrate AI to scale personalization without extra headcount—curious if that's a current focus for you?"
-    ],
     "opportunities": [
-      "Strong fit for AI-driven campaign optimization or funnel automation.",
-      "Possible co-creation of client tools or white-label AI marketing solutions."
+      "🚨 Direct AI-driven optimization of marketing campaigns and sales funnels.",
+      "🚨 Co-creation of scalable white-label AI marketing platforms and tools.",
+      "🚨 Development of bespoke AI solutions and tools tailored to individual client needs."
+    ],
+    "conversation_starters": [
+      "💭 Are you currently exploring how AI could significantly enhance the performance and ROI of your marketing campaigns or sales funnels?",
+      "💭 How are you currently looking to leverage AI to grow your product line or service offerings in a scalable way for your market?",
+      "💭 What's a critical, unique bottleneck in your business operations where you suspect a custom-tailored AI solution could make a significant impact?"
     ]
   }
 }`;
@@ -547,12 +555,21 @@ async function handleDatabaseOperations(contactData, research) {
       [contactData.primary_email]
     );
     
+    // Format opportunities as plain text with line breaks
+    let opportunitiesNote = `Contact added via business card scan on ${new Date().toLocaleDateString()}`;
+    
+    if (research.research && research.research.opportunities && research.research.opportunities !== "Not available") {
+      if (Array.isArray(research.research.opportunities)) {
+        // If it's an array, join with line breaks to show all 3 opportunities
+        opportunitiesNote = research.research.opportunities.join('\n');
+      } else if (typeof research.research.opportunities === 'string') {
+        // If it's a string, use as-is
+        opportunitiesNote = research.research.opportunities;
+      }
+    }
+    
     if (existingContact.rows.length === 0) {
-      // Insert new contact - use opportunities from research as notes
-      const opportunitiesNote = research.research && research.research.opportunities && research.research.opportunities !== "Not available" 
-        ? research.research.opportunities 
-        : `Contact added via business card scan on ${new Date().toLocaleDateString()}`;
-      
+      // Insert new contact - use formatted opportunities as notes
       const insertResult = await client.query(`
         INSERT INTO contacts (
           name, company, industry, primary_email, secondary_email, primary_phone, secondary_phone,
@@ -575,7 +592,7 @@ async function handleDatabaseOperations(contactData, research) {
         opportunitiesNote
       ]);
       
-      console.log('✅ New contact created with opportunities note from research');
+      console.log('✅ New contact created with formatted opportunities note from research');
       
       return {
         success: true,
@@ -584,12 +601,8 @@ async function handleDatabaseOperations(contactData, research) {
       };
       
     } else {
-      // Contact already exists - add touchpoint with opportunities from research
+      // Contact already exists - add touchpoint with formatted opportunities
       const contactId = existingContact.rows[0].id;
-      
-      const opportunitiesNote = research.research && research.research.opportunities && research.research.opportunities !== "Not available" 
-        ? research.research.opportunities 
-        : `Business card scanned on ${new Date().toLocaleDateString()}`;
       
       await client.query(`
         INSERT INTO touchpoints (
@@ -601,7 +614,7 @@ async function handleDatabaseOperations(contactData, research) {
         'IN_PERSON'
       ]);
       
-      console.log('✅ Touchpoint added for existing contact with opportunities note');
+      console.log('✅ Touchpoint added for existing contact with formatted opportunities note');
       
       return {
         success: true,
