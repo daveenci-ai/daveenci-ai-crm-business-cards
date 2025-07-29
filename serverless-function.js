@@ -24,7 +24,8 @@ const config = {
   
   // Telegram
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
-  telegramChatId: process.env.TELEGRAM_CHAT_ID,
+  telegramChatIdAnton: process.env.TELEGRAM_CHAT_ID_ANTON,
+  telegramChatIdAstrid: process.env.TELEGRAM_CHAT_ID_ASTRID,
   
   // GitHub
   githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET,
@@ -72,7 +73,8 @@ async function handleBusinessCardWebhook(event, context) {
     const extractedData = await extractBusinessCardData(imageData);
     if (!extractedData.success) {
       console.log('❌ STEP 4 FAILED: Data extraction failed -', extractedData.error);
-      await sendTelegramError(`❌ Failed to extract data from business card: ${extractedData.error}`);
+      const personName = extractPersonFromImagePath(imagePath);
+      await sendTelegramError(`❌ Failed to extract data from business card: ${extractedData.error}`, personName);
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Data extraction failed', details: extractedData.error })
@@ -98,7 +100,8 @@ async function handleBusinessCardWebhook(event, context) {
     const validation = validateExtractedData(extractedData.data);
     if (!validation.valid) {
       console.log('❌ STEP 5 FAILED: Data validation failed -', validation.errors.join(', '));
-      await sendTelegramError(`❌ Invalid data extracted: ${validation.errors.join(', ')}`);
+      const personName = extractPersonFromImagePath(imagePath);
+      await sendTelegramError(`❌ Invalid data extracted: ${validation.errors.join(', ')}`, personName);
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Data validation failed', details: validation.errors })
@@ -146,7 +149,8 @@ async function handleBusinessCardWebhook(event, context) {
     const dbResult = await handleDatabaseOperations(extractedData.data, research, imagePath);
     if (!dbResult.success) {
       console.log('❌ STEP 7 FAILED: Database operation failed -', dbResult.error);
-      await sendTelegramError(`❌ Database operation failed: ${dbResult.error}`);
+      const personName = extractPersonFromImagePath(imagePath);
+      await sendTelegramError(`❌ Database operation failed: ${dbResult.error}`, personName);
       return {
         statusCode: 500,
         body: JSON.stringify({ error: 'Database operation failed', details: dbResult.error })
@@ -181,7 +185,18 @@ async function handleBusinessCardWebhook(event, context) {
     console.error('❌ PIPELINE ERROR: Unexpected error at', new Date().toISOString());
     console.error('❌ Error details:', error.message);
     console.error('❌ Stack trace:', error.stack);
-    await sendTelegramError(`❌ Business card processing failed: ${error.message}`);
+    
+    // Try to extract person name for error notification, but don't fail if it errors
+    let personName = null;
+    try {
+      if (typeof imagePath !== 'undefined') {
+        personName = extractPersonFromImagePath(imagePath);
+      }
+    } catch (e) {
+      console.log('⚠️ Could not extract person name for error notification');
+    }
+    
+    await sendTelegramError(`❌ Business card processing failed: ${error.message}`, personName);
     
     return {
       statusCode: 500,
@@ -693,13 +708,42 @@ function extractPersonFromImagePath(imagePath) {
 }
 
 /**
+ * Get the correct Telegram chat ID based on person name
+ */
+function getTelegramChatId(personName) {
+  if (!personName) {
+    console.log('⚠️ No person name provided, using Anton as default');
+    return config.telegramChatIdAnton;
+  }
+  
+  const name = personName.toLowerCase();
+  
+  if (name === 'anton') {
+    console.log('📱 Using Anton\'s Telegram chat ID');
+    return config.telegramChatIdAnton;
+  } else if (name === 'astrid') {
+    console.log('📱 Using Astrid\'s Telegram chat ID');
+    return config.telegramChatIdAstrid;
+  } else {
+    console.log(`⚠️ Unknown person name "${personName}", using Anton as default`);
+    return config.telegramChatIdAnton;
+  }
+}
+
+/**
  * Send Telegram notification
  */
 async function sendTelegramNotification(contactData, research, dbResult, imagePath) {
   try {
     console.log('📱 Telegram: Preparing notification message...');
     console.log('📱 Telegram: Bot token configured:', !!config.telegramBotToken);
-    console.log('📱 Telegram: Chat ID configured:', !!config.telegramChatId);
+    
+    // Get the person name and corresponding chat ID
+    const personName = extractPersonFromImagePath(imagePath);
+    const chatId = getTelegramChatId(personName);
+    
+    console.log('📱 Telegram: Person from image:', personName);
+    console.log('📱 Telegram: Selected chat ID configured:', !!chatId);
     
     let message;
     
@@ -769,10 +813,10 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
     const escapedMessage = message
       .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
     
-    console.log('📱 Telegram: Sending message to chat ID:', config.telegramChatId);
+    console.log('📱 Telegram: Sending message to chat ID:', chatId);
     
     await axios.post(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
-      chat_id: config.telegramChatId,
+      chat_id: chatId,
       text: escapedMessage,
       parse_mode: 'MarkdownV2'
     });
@@ -791,12 +835,13 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
 /**
  * Send error notification to Telegram
  */
-async function sendTelegramError(errorMessage) {
+async function sendTelegramError(errorMessage, personName = null) {
   try {
     const escapedMessage = errorMessage.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    const chatId = getTelegramChatId(personName); // Defaults to Anton if no person name
     
     await axios.post(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
-      chat_id: config.telegramChatId,
+      chat_id: chatId,
       text: escapedMessage,
       parse_mode: 'MarkdownV2'
     });

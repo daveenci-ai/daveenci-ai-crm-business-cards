@@ -9,7 +9,8 @@ GEMINI_API_KEY=your-gemini-api-key-from-google-ai-studio
 
 # Telegram Bot Configuration (Required for notifications)
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token-from-botfather
-TELEGRAM_CHAT_ID=your-telegram-chat-id-or-group-id
+TELEGRAM_CHAT_ID_ANTON=anton-telegram-chat-id
+TELEGRAM_CHAT_ID_ASTRID=astrid-telegram-chat-id
 
 # Node.js Configuration
 NODE_ENV=production
