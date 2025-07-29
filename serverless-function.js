@@ -620,9 +620,21 @@ async function handleDatabaseOperations(contactData, research, imagePath) {
       };
       
     } else {
-      // Contact already exists - add touchpoint with simple in-person meeting note
+      // Contact already exists - get touchpoint history first
       const contactId = existingContact.rows[0].id;
       
+      // Fetch all existing touchpoints for this contact
+      const touchpointHistory = await client.query(`
+        SELECT note, source, added_by, created_at
+        FROM touchpoints 
+        WHERE contact_id = $1 
+        ORDER BY created_at DESC
+        LIMIT 10
+      `, [contactId]);
+      
+      console.log(`📊 Found ${touchpointHistory.rows.length} previous touchpoints for existing contact`);
+      
+      // Add new touchpoint with simple in-person meeting note
       const touchpointNote = `Met in person - business card exchanged on ${new Date().toLocaleDateString()}${addedBy ? ` by ${addedBy}` : ''}`;
       
       await client.query(`
@@ -641,7 +653,8 @@ async function handleDatabaseOperations(contactData, research, imagePath) {
       return {
         success: true,
         isNewContact: false,
-        contactId: contactId
+        contactId: contactId,
+        touchpointHistory: touchpointHistory.rows
       };
     }
     
@@ -708,14 +721,41 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
         console.log('📱 Telegram: Research failed, including fallback message');
       }
     } else {
-      // Existing contact - simple message with who met them
+      // Existing contact - show interaction history
       const whoMet = extractPersonFromImagePath(imagePath);
       message = `🔄 We already met with ${contactData.name}`;
       if (whoMet) {
         message += ` (${whoMet} met them)`;
       }
       message += `\n🏢 ${contactData.company || 'Not specified'}`;
-      console.log('📱 Telegram: Simple existing contact message');
+      
+      // Add touchpoint history
+      if (dbResult.touchpointHistory && dbResult.touchpointHistory.length > 0) {
+        message += `\n\n📅 Previous interactions:`;
+        
+        dbResult.touchpointHistory.forEach((touchpoint, index) => {
+          if (index < 5) { // Limit to 5 most recent touchpoints to avoid overly long messages
+            const date = new Date(touchpoint.created_at).toLocaleDateString();
+            const addedBy = touchpoint.added_by ? ` (${touchpoint.added_by})` : '';
+            const source = touchpoint.source || 'Unknown';
+            
+            message += `\n• ${date}: ${source}${addedBy}`;
+            
+            // Add a brief note if available and not too long
+            if (touchpoint.note && touchpoint.note.length < 50) {
+              message += ` - ${touchpoint.note}`;
+            }
+          }
+        });
+        
+        if (dbResult.touchpointHistory.length > 5) {
+          message += `\n... and ${dbResult.touchpointHistory.length - 5} more interactions`;
+        }
+      } else {
+        message += `\n\n📅 No previous interaction history found`;
+      }
+      
+      console.log('📱 Telegram: Existing contact message with interaction history');
     }
     
     console.log('📱 Telegram: Message length:', message.length, 'characters');
