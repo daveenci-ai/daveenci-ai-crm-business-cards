@@ -585,7 +585,7 @@ async function handleDatabaseOperations(contactData, research) {
         contactData.website,
         contactData.address,
         'Business Card Scan',
-        'PROSPECTS',
+        'PROSPECT',
         userId,
         opportunitiesNote
       ]);
