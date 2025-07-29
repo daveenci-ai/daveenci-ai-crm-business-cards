@@ -421,8 +421,8 @@ json
       name: contactData.full_name || "Unknown Person",
       company: contactData.company_name || "Unknown Company", 
       industry: contactData.industry || "Unknown Industry",
-      primary_email: contactData.primary_email || "unknown@unknown.com",
-      secondary_email: contactData.secondary_email || null,
+      primary_email: (contactData.primary_email || "unknown@unknown.com").toLowerCase().trim(),
+      secondary_email: contactData.secondary_email ? contactData.secondary_email.toLowerCase().trim() : null,
       primary_phone: contactData.primary_phone || "0000000000",
       secondary_phone: contactData.secondary_phone || null,
       website: contactData.website_url || "unknown.com",
@@ -437,7 +437,7 @@ json
       pinterest_url: contactData.pinterest_url || null
     };
     
-    // Validate and clean email fields
+    // Validate email fields (already cleaned/lowercased/trimmed above)
     const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
     if (!emailRegex.test(cleanedData.primary_email)) {
       cleanedData.primary_email = "unknown@unknown.com";
@@ -566,9 +566,9 @@ async function handleDatabaseOperations(contactData, research, imagePath) {
     
     const userId = userResult.rows[0].id;
     
-    // Check if contact exists
+    // Check if contact exists (case-insensitive and trim spaces)
     const existingContact = await client.query(
-      'SELECT id, notes FROM contacts WHERE primary_email = $1',
+      'SELECT id, notes FROM contacts WHERE LOWER(TRIM(primary_email)) = LOWER(TRIM($1))',
       [contactData.primary_email]
     );
     
