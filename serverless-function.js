@@ -725,10 +725,7 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
     } else {
       // Existing contact - show interaction history
       const whoMet = extractPersonFromImagePath(imagePath);
-      message = `🔄 We already met with ${contactData.name}`;
-      if (whoMet) {
-        message += ` (${whoMet} met them)`;
-      }
+      message = `🔄 We already met with <b>${contactData.name}</b>`;
       message += `\n🏢 ${contactData.company || 'Not specified'}`;
       
       // Add touchpoint history
