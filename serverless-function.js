@@ -769,7 +769,7 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
     } else {
       // Existing contact - show interaction history
       const whoMet = extractPersonFromImagePath(imagePath);
-      message = `🔄 **${contactData.name}**`;
+      message = `🔄 ${contactData.name}`;
       message += `\n🏢 ${contactData.company || 'Not specified'}`;
       
       // Add touchpoint history
@@ -800,7 +800,7 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
       
       // Add contact notes (research insights) to help identify the person
       if (dbResult.contactNotes && dbResult.contactNotes.trim().length > 0) {
-        message += `\n\n💡 **Notes:**\n\n${dbResult.contactNotes}`;
+        message += `\n\n💡 Notes:\n\n${dbResult.contactNotes}`;
         console.log('📱 Telegram: Including contact notes for context');
       }
       
