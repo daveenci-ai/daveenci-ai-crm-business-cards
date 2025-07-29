@@ -553,7 +553,7 @@ async function handleDatabaseOperations(contactData, research, imagePath) {
     
     // Check if contact exists
     const existingContact = await client.query(
-      'SELECT id FROM contacts WHERE primary_email = $1',
+      'SELECT id, notes FROM contacts WHERE primary_email = $1',
       [contactData.primary_email]
     );
     
@@ -622,6 +622,7 @@ async function handleDatabaseOperations(contactData, research, imagePath) {
     } else {
       // Contact already exists - get touchpoint history first
       const contactId = existingContact.rows[0].id;
+      const contactNotes = existingContact.rows[0].notes;
       
       // Fetch all existing touchpoints for this contact
       const touchpointHistory = await client.query(`
@@ -654,7 +655,8 @@ async function handleDatabaseOperations(contactData, research, imagePath) {
         success: true,
         isNewContact: false,
         contactId: contactId,
-        touchpointHistory: touchpointHistory.rows
+        touchpointHistory: touchpointHistory.rows,
+        contactNotes: contactNotes
       };
     }
     
@@ -755,7 +757,13 @@ async function sendTelegramNotification(contactData, research, dbResult, imagePa
         message += `\n\n📅 No previous interaction history found`;
       }
       
-      console.log('📱 Telegram: Existing contact message with interaction history');
+      // Add contact notes (research insights) to help identify the person
+      if (dbResult.contactNotes && dbResult.contactNotes.trim().length > 0) {
+        message += `\n\n💡 Notes about this contact:\n${dbResult.contactNotes}`;
+        console.log('📱 Telegram: Including contact notes for context');
+      }
+      
+      console.log('📱 Telegram: Existing contact message with interaction history and notes');
     }
     
     console.log('📱 Telegram: Message length:', message.length, 'characters');
