@@ -143,7 +143,7 @@ async function handleBusinessCardWebhook(event, context) {
     
     // Step 5: Database operations (pass research data for new contacts)
     console.log('💾 STEP 7: Starting database operations...');
-    const dbResult = await handleDatabaseOperations(extractedData.data, research);
+    const dbResult = await handleDatabaseOperations(extractedData.data, research, imagePath);
     if (!dbResult.success) {
       console.log('❌ STEP 7 FAILED: Database operation failed -', dbResult.error);
       await sendTelegramError(`❌ Database operation failed: ${dbResult.error}`);
@@ -159,7 +159,7 @@ async function handleBusinessCardWebhook(event, context) {
     
     // Step 6: Send Telegram notification (for all contacts)
     console.log('📱 STEP 8: Sending Telegram notification...');
-    await sendTelegramNotification(extractedData.data, research, dbResult);
+    await sendTelegramNotification(extractedData.data, research, dbResult, imagePath);
     console.log('✅ STEP 8 COMPLETE: Telegram notification sent successfully');
     
     console.log('🎉 PIPELINE COMPLETE: All steps finished successfully');
@@ -531,10 +531,14 @@ function validateExtractedData(data) {
 /**
  * Handle database operations (check existing, insert contact or touchpoint)
  */
-async function handleDatabaseOperations(contactData, research) {
+async function handleDatabaseOperations(contactData, research, imagePath) {
   const client = await pool.connect();
   
   try {
+    // Extract person name from image path
+    const addedBy = extractPersonFromImagePath(imagePath);
+    console.log('👤 Person who added contact:', addedBy || 'Unknown');
+    
     // Get Admin user ID
     const userResult = await client.query(
       'SELECT id FROM users WHERE name = $1 LIMIT 1',
@@ -584,35 +588,55 @@ async function handleDatabaseOperations(contactData, research) {
         contactData.secondary_phone,
         contactData.website,
         contactData.address,
-        'Business Card Scan',
+        'Business Card',
         'PROSPECT',
         userId,
         opportunitiesNote
       ]);
       
+      const newContactId = insertResult.rows[0].id;
       console.log('✅ New contact created with formatted opportunities note from research');
+      
+      // Also create a touchpoint for the new contact
+      const newContactTouchpointNote = `New contact added - business card exchanged on ${new Date().toLocaleDateString()}${addedBy ? ` by ${addedBy}` : ''}`;
+      
+      await client.query(`
+        INSERT INTO touchpoints (
+          contact_id, note, source, added_by, created_at
+        ) VALUES ($1, $2, $3, $4, NOW())
+      `, [
+        newContactId,
+        newContactTouchpointNote,
+        'IN_PERSON',
+        addedBy
+      ]);
+      
+      console.log('✅ Touchpoint also created for new contact with person name');
       
       return {
         success: true,
         isNewContact: true,
-        contactId: insertResult.rows[0].id
+        contactId: newContactId
       };
       
     } else {
-      // Contact already exists - add touchpoint with formatted opportunities
+      // Contact already exists - add touchpoint with simple in-person meeting note
       const contactId = existingContact.rows[0].id;
+      
+      const touchpointNote = `Met in person - business card exchanged on ${new Date().toLocaleDateString()}${addedBy ? ` by ${addedBy}` : ''}`;
       
       await client.query(`
         INSERT INTO touchpoints (
-          contact_id, note, source, created_at
-        ) VALUES ($1, $2, $3, NOW())
+          contact_id, note, source, added_by, created_at
+        ) VALUES ($1, $2, $3, $4, NOW())
       `, [
         contactId,
-        opportunitiesNote,
-        'IN_PERSON'
+        touchpointNote,
+        'IN_PERSON',
+        addedBy
       ]);
       
-      console.log('✅ Touchpoint added for existing contact with formatted opportunities note');
+      console.log('✅ Touchpoint added for existing contact with person name in note and added_by field');
       
       return {
         success: true,
@@ -633,30 +657,65 @@ async function handleDatabaseOperations(contactData, research) {
 
 
 /**
+ * Extract person name from image filename (e.g. "2025-01-01_Anton.jpg" -> "Anton")
+ */
+function extractPersonFromImagePath(imagePath) {
+  try {
+    // Get filename without extension
+    const filename = imagePath.split('/').pop().split('.')[0];
+    
+    // Look for pattern ending with "_PersonName"
+    const match = filename.match(/_([A-Za-z]+)$/);
+    if (match) {
+      return match[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.log('❌ Error extracting person from image path:', error.message);
+    return null;
+  }
+}
+
+/**
  * Send Telegram notification
  */
-async function sendTelegramNotification(contactData, research, dbResult) {
+async function sendTelegramNotification(contactData, research, dbResult, imagePath) {
   try {
     console.log('📱 Telegram: Preparing notification message...');
     console.log('📱 Telegram: Bot token configured:', !!config.telegramBotToken);
     console.log('📱 Telegram: Chat ID configured:', !!config.telegramChatId);
     
-    const status = dbResult.isNewContact ? '✅' : '🔄';
+    let message;
     
-    let message = `${status} ${contactData.name}\n`;
-    message += `🏢 ${contactData.company || 'Not specified'}\n`;
-    message += `📧 ${contactData.primary_email}\n`;
-    if (contactData.primary_phone) {
-      message += `📞 ${contactData.primary_phone}\n`;
-    }
-    message += `\n`;
-    
-    if (research.success) {
-      message += research.telegramMessage;
-      console.log('📱 Telegram: Including research insights in message');
+    if (dbResult.isNewContact) {
+      // New contact - show full details and research
+      const status = '✅';
+      
+      message = `${status} ${contactData.name}\n`;
+      message += `🏢 ${contactData.company || 'Not specified'}\n`;
+      message += `📧 ${contactData.primary_email}\n`;
+      if (contactData.primary_phone) {
+        message += `📞 ${contactData.primary_phone}\n`;
+      }
+      message += `\n`;
+      
+      if (research.success) {
+        message += research.telegramMessage;
+        console.log('📱 Telegram: Including research insights in message');
+      } else {
+        message += `⚠️ Research could not be completed at this time.`;
+        console.log('📱 Telegram: Research failed, including fallback message');
+      }
     } else {
-      message += `⚠️ Research could not be completed at this time.`;
-      console.log('📱 Telegram: Research failed, including fallback message');
+      // Existing contact - simple message with who met them
+      const whoMet = extractPersonFromImagePath(imagePath);
+      message = `🔄 We already met with ${contactData.name}`;
+      if (whoMet) {
+        message += ` (${whoMet} met them)`;
+      }
+      message += `\n🏢 ${contactData.company || 'Not specified'}`;
+      console.log('📱 Telegram: Simple existing contact message');
     }
     
     console.log('📱 Telegram: Message length:', message.length, 'characters');
